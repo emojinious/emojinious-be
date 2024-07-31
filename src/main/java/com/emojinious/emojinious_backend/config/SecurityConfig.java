@@ -19,6 +19,7 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/", "/index.html", "/js/**", "/css/**", "/ws/**").permitAll()
                         .requestMatchers("/api/players/**").permitAll()
                         .anyRequest().authenticated()
                 )
