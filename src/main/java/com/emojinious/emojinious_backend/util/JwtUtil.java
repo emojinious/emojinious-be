@@ -31,6 +31,12 @@ public class JwtUtil {
                 .compact();
     }
 
+    public String refreshToken(String token) {
+        Claims claims = validateToken(token);
+        return generateToken(claims.getSubject(), claims.get("sessionId", String.class), claims.get("isHost", Boolean.class));
+    }
+
+
     public Claims validateToken(String token) {
         return Jwts.parserBuilder()
                 .setSigningKey(getSigningKey())

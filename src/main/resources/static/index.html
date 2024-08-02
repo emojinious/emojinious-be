@@ -1,67 +1,220 @@
 <!DOCTYPE html>
-<html>
+<html lang="ko">
 <head>
-    <title>WebSocket Test</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.5.1/sockjs.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emojinious 테스트 페이지</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.5.0/sockjs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+        h1, h2 { color: #333; }
+        input, button { margin: 5px 0; padding: 5px; }
+        #gameState, #chatMessages, #requestLog { border: 1px solid #ccc; padding: 10px; margin-top: 10px; }
+        #requestLog { height: 200px; overflow-y: auto; }
+        .log-entry { margin-bottom: 10px; }
+        .log-entry pre { margin: 0; white-space: pre-wrap; }
+    </style>
 </head>
 <body>
-<h1>WebSocket Test</h1>
-<div>
-    <button id="connect" onclick="connect()">Connect</button>
-    <button id="disconnect" onclick="disconnect()" disabled>Disconnect</button>
-</div>
-<br>
-<div>
-    <input type="text" id="message" placeholder="Enter a message" disabled>
-    <button id="send" onclick="sendMessage()" disabled>Send</button>
-</div>
-<br>
-<div id="log"></div>
+<h1>Emojinious 테스트 페이지</h1>
+
+<h2>플레이어 정보</h2>
+<div id="playerInfo"></div>
+
+<h2>플레이어 생성</h2>
+<input type="text" id="nickname" placeholder="닉네임">
+<input type="number" id="characterId" placeholder="캐릭터 ID" min="1" max="8">
+<button onclick="createPlayer()">플레이어 생성</button>
+
+<h2>게임 설정</h2>
+<input type="number" id="promptTimeLimit" placeholder="프롬프트 시간 제한">
+<input type="number" id="guessTimeLimit" placeholder="추측 시간 제한">
+<input type="text" id="difficulty" placeholder="난이도">
+<input type="number" id="turns" placeholder="턴 수">
+<button onclick="updateGameSettings()">게임 설정 업데이트</button>
+
+<h2>게임 제어</h2>
+<button onclick="startGame()">게임 시작</button>
+
+<h2>프롬프트 및 추측 제출</h2>
+<input type="text" id="prompt" placeholder="프롬프트">
+<button onclick="submitPrompt()">프롬프트 제출</button>
+<input type="text" id="guess" placeholder="추측">
+<button onclick="submitGuess()">추측 제출</button>
+
+<h2>채팅</h2>
+<input type="text" id="chatMessage" placeholder="채팅 메시지">
+<button onclick="sendChatMessage()">채팅 보내기</button>
+<div id="chatMessages"></div>
+
+<h2>게임 상태</h2>
+<div id="gameState"></div>
+
+<h2>요청/응답 로그</h2>
+<div id="requestLog"></div>
 
 <script>
-    var stompClient = null;
+    let stompClient = null;
+    let sessionId = null;
+    let playerId = null;
+    let token = null;
+    let isHost = false;
+
+    function logRequestResponse(method, url, requestData, responseData) {
+        const logEntry = document.createElement('div');
+        logEntry.className = 'log-entry';
+        logEntry.innerHTML = `
+                <strong>${method} ${url}</strong>
+                <pre>Request: ${JSON.stringify(requestData, null, 2)}</pre>
+                <pre>Response: ${JSON.stringify(responseData, null, 2)}</pre>
+            `;
+        document.getElementById('requestLog').prepend(logEntry);
+    }
 
     function connect() {
-        var socket = new SockJS('/ws');
+        const socket = new SockJS('/ws', null, {
+            transportOptions: {
+                websocket: {
+                    headers: {'Authorization': 'Bearer ' + token}
+                }
+            }
+        });
         stompClient = Stomp.over(socket);
-        stompClient.connect({}, function (frame) {
-            setConnected(true);
+
+        stompClient.connect({}, function(frame) {
             console.log('Connected: ' + frame);
-            stompClient.subscribe('/topic/greetings', function (greeting) {
-                showGreeting(greeting.body);
+            // 연결 확인 메시지 전송
+            stompClient.send("/app/connect", {}, JSON.stringify({playerId: playerId, token: token}));
+
+            stompClient.subscribe('/user/queue/connect-ack', function(message) {
+                if (message.body === "Connected successfully") {
+                    // 연결 성공 후 로직
+                    subscribeToGameTopics();
+                    joinGame();
+                } else {
+                    console.error("Connection failed");
+                    stompClient.disconnect();
+                }
             });
         });
     }
 
-    function disconnect() {
-        if (stompClient !== null) {
-            stompClient.disconnect();
-        }
-        setConnected(false);
-        console.log("Disconnected");
+    function subscribeToGameTopics() {
+        stompClient.subscribe('/topic/game/' + sessionId, function(gameState) {
+            showGameState(JSON.parse(gameState.body));
+        });
+        stompClient.subscribe('/topic/game/' + sessionId + '/chat', function(chatMessage) {
+            showChatMessage(JSON.parse(chatMessage.body));
+        });
     }
 
-    function sendMessage() {
-        var message = document.getElementById('message').value;
-        stompClient.send("/app/hello", {}, message);
+    // SockJS와 STOMP 클라이언트 라이브러리를 CDN에서 로드
+    document.write('<script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"><\/script>');
+    document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"><\/script>');
+
+    function createPlayer() {
+        const nickname = document.getElementById('nickname').value;
+        const characterId = document.getElementById('characterId').value;
+        const urlParams = new URLSearchParams(window.location.search);
+        sessionId = urlParams.get('sessionId');
+
+        const url = sessionId ? `/api/players/guest/${sessionId}` : '/api/players/host';
+        const body = { nickname, characterId };
+
+        fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        })
+            .then(response => response.json())
+            .then(data => {
+                playerId = data.player.id;
+                token = data.token;
+                isHost = !sessionId;
+                sessionId = data.player.sessionId;
+                updatePlayerInfo(data.player);
+                logRequestResponse('POST', url, body, data);
+                if (isHost) {
+                    alert('초대 링크: ' + data.inviteLink);
+                }
+                connect();  // connect() 함수를 여기서 호출
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                logRequestResponse('POST', url, body, { error: error.message });
+            });
     }
 
-    function showGreeting(message) {
-        var log = document.getElementById('log');
-        var p = document.createElement('p');
-        p.appendChild(document.createTextNode(message));
-        log.appendChild(p);
+    function updatePlayerInfo(player) {
+        const playerInfo = document.getElementById('playerInfo');
+        playerInfo.innerHTML = `
+                <p>플레이어 ID: ${player.id}</p>
+                <p>닉네임: ${player.nickname}</p>
+                <p>세션 ID: ${player.sessionId}</p>
+                <p>역할: ${player.isHost ? '호스트' : '게스트'}</p>
+                <p>토큰: ${token}</p>
+            `;
     }
 
-    function setConnected(connected) {
-        document.getElementById('connect').disabled = connected;
-        document.getElementById('disconnect').disabled = !connected;
-        document.getElementById('message').disabled = !connected;
-        document.getElementById('send').disabled = !connected;
-        if (connected) {
-            document.getElementById('log').innerHTML = '';
-        }
+    function joinGame() {
+        stompClient.send(`/app/game/${sessionId}/join`, {}, JSON.stringify({}));
+    }
+
+    function updateGameSettings() {
+        const settings = {
+            promptTimeLimit: document.getElementById('promptTimeLimit').value,
+            guessTimeLimit: document.getElementById('guessTimeLimit').value,
+            difficulty: document.getElementById('difficulty').value,
+            turns: document.getElementById('turns').value
+        };
+        fetch(`/api/sessions/${sessionId}/settings`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(settings)
+        })
+            .then(response => response.text())
+            .then(message => {
+                alert(message);
+                logRequestResponse('PUT', `/api/sessions/${sessionId}/settings`, settings, message);
+            });
+    }
+
+    function startGame() {
+        stompClient.send(`/app/game/${sessionId}/start`, {}, JSON.stringify({}));
+        logRequestResponse('STOMP', `/app/game/${sessionId}/start`, {}, 'Message sent');
+    }
+
+    function submitPrompt() {
+        const prompt = document.getElementById('prompt').value;
+        stompClient.send(`/app/game/${sessionId}/prompt`, {}, JSON.stringify({ prompt }));
+        logRequestResponse('STOMP', `/app/game/${sessionId}/prompt`, { prompt }, 'Message sent');
+    }
+
+    function submitGuess() {
+        const guess = document.getElementById('guess').value;
+        stompClient.send(`/app/game/${sessionId}/guess`, {}, JSON.stringify({ guess }));
+        logRequestResponse('STOMP', `/app/game/${sessionId}/guess`, { guess }, 'Message sent');
+    }
+
+    function sendChatMessage() {
+        const content = document.getElementById('chatMessage').value;
+        stompClient.send(`/app/game/${sessionId}/chat`, {}, JSON.stringify({ content }));
+        logRequestResponse('STOMP', `/app/game/${sessionId}/chat`, { content }, 'Message sent');
+    }
+
+    function showGameState(gameState) {
+        document.getElementById('gameState').innerText = JSON.stringify(gameState, null, 2);
+        logRequestResponse('STOMP', `/topic/game/${sessionId}`, {}, gameState);
+    }
+
+    function showChatMessage(chatMessage) {
+        const chatMessages = document.getElementById('chatMessages');
+        chatMessages.innerHTML += `<p><strong>${chatMessage.sender}:</strong> ${chatMessage.content}</p>`;
+        logRequestResponse('STOMP', `/topic/game/${sessionId}/chat`, {}, chatMessage);
     }
 </script>
 </body>

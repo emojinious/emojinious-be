@@ -1,6 +1,6 @@
 package com.emojinious.emojinious_backend.controller;
 
-import com.emojinious.emojinious_backend.cache.PlayerSessionCache;
+import com.emojinious.emojinious_backend.model.Player;
 import com.emojinious.emojinious_backend.dto.PlayerCreateRequest;
 import com.emojinious.emojinious_backend.service.PlayerService;
 import jakarta.validation.Valid;
@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/players")
@@ -19,8 +20,9 @@ public class PlayerController {
 
     @PostMapping("/host")
     public ResponseEntity<?> createHostPlayer(@Valid @RequestBody PlayerCreateRequest request) {
-        PlayerSessionCache player = playerService.createHostPlayer(request.getNickname(), request.getCharacterId());
-        String inviteLink = playerService.generateInviteLink(player.getSessionId());
+        String sessionId = UUID.randomUUID().toString();
+        Player player = playerService.createPlayer(request.getNickname(), request.getCharacterId(), sessionId, true);
+        String inviteLink = playerService.generateInviteLink(sessionId);
 
         Map<String, Object> response = new HashMap<>();
         response.put("player", player);
@@ -33,7 +35,7 @@ public class PlayerController {
     @PostMapping("/guest/{sessionId}")
     public ResponseEntity<?> createGuestPlayer(@PathVariable String sessionId,
                                                @Valid @RequestBody PlayerCreateRequest request) {
-        PlayerSessionCache player = playerService.createGuestPlayer(request.getNickname(), request.getCharacterId(), sessionId);
+        Player player = playerService.createPlayer(request.getNickname(), request.getCharacterId(), sessionId, false);
 
         Map<String, Object> response = new HashMap<>();
         response.put("player", player);
@@ -41,5 +43,4 @@ public class PlayerController {
 
         return ResponseEntity.ok(response);
     }
-
 }
