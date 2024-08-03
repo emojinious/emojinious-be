@@ -1,5 +1,6 @@
 package com.emojinious.emojinious_backend.service;
 
+import com.emojinious.emojinious_backend.cache.Player;
 import com.emojinious.emojinious_backend.dto.*;
 import com.emojinious.emojinious_backend.model.*;
 import com.emojinious.emojinious_backend.constant.GameState;
@@ -10,7 +11,6 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -122,6 +122,11 @@ public class GameService {
             throw new IllegalStateException("Game session not found");
         }
         return gameSession;
+    }
+
+    public GameStateDto getGameState(String sessionId) {
+        GameSession gameSession = getGameSession(sessionId);
+        return createGameStateDto(gameSession);
     }
 
     private void updateGameSession(GameSession gameSession) {

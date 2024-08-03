@@ -1,17 +1,21 @@
-package com.emojinious.emojinious_backend.model;
+package com.emojinious.emojinious_backend.cache;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.io.Serializable;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
+import org.springframework.data.redis.core.RedisHash;
 
 @Data
+@RedisHash("player_session")
 @NoArgsConstructor
 @AllArgsConstructor
 public class Player implements Serializable {
     private String id;
     private String nickname;
     private int characterId;
+    @JsonProperty("isHost")
     private boolean isHost;
     private int score;
     private String token;

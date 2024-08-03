@@ -1,6 +1,6 @@
 package com.emojinious.emojinious_backend.service;
 
-import com.emojinious.emojinious_backend.model.Player;
+import com.emojinious.emojinious_backend.cache.Player;
 import com.emojinious.emojinious_backend.util.JwtUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;

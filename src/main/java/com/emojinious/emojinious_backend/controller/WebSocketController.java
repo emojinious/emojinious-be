@@ -1,7 +1,9 @@
 package com.emojinious.emojinious_backend.controller;
 
 import com.emojinious.emojinious_backend.dto.*;
+import com.emojinious.emojinious_backend.cache.Player;
 import com.emojinious.emojinious_backend.service.GameService;
+import com.emojinious.emojinious_backend.service.PlayerService;
 import com.emojinious.emojinious_backend.util.JwtUtil;
 import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +20,7 @@ import org.springframework.stereotype.Controller;
 public class WebSocketController {
 
     private final GameService gameService;
+    private final PlayerService playerService;
     private final JwtUtil jwtUtil;
 
     @MessageMapping("/connect")
@@ -31,12 +34,22 @@ public class WebSocketController {
         try {
             Claims claims = jwtUtil.validateToken(token);
             if (claims.getSubject().equals(playerId)) {
-                headerAccessor.getSessionAttributes().put("playerId", playerId);
-                headerAccessor.getSessionAttributes().put("sessionId", claims.get("sessionId", String.class));
-                return "Connected successfully";
+                Player player = playerService.getPlayerById(playerId);
+
+                if (player != null) {
+                    headerAccessor.getSessionAttributes().put("playerId", playerId);
+                    headerAccessor.getSessionAttributes().put("sessionId", claims.get("sessionId", String.class));
+                    headerAccessor.getSessionAttributes().put("nickname", player.getNickname());
+                    headerAccessor.getSessionAttributes().put("characterId", player.getCharacterId());
+                    headerAccessor.getSessionAttributes().put("isHost", player.isHost());
+
+                    return "Connected successfully";
+                } else {
+                    return "Player not found";
+                }
             }
         } catch (Exception e) {
-            // 토큰 검증 실패
+            return "Invalid token";
         }
         return "Connection failed";
     }
