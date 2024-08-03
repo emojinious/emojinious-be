@@ -1,5 +1,6 @@
 package com.emojinious.emojinious_backend.model;
 
+import com.emojinious.emojinious_backend.cache.Player;
 import com.emojinious.emojinious_backend.constant.GameState;
 import lombok.Data;
 import java.io.Serializable;
@@ -17,6 +18,10 @@ public class GameSession implements Serializable {
     private Map<String, String> currentKeywords;
     private long turnStartTime;
     private long turnEndTime;
+
+    public GameSession() {
+        // 역직렬화 문제 방지
+    }
 
     public GameSession(String sessionId) {
         this.sessionId = sessionId;
@@ -72,6 +77,7 @@ public class GameSession implements Serializable {
 
     private void generateKeywords() {
         // Logic to generate and assign keywords to players
+        // ha...tlqkf
     }
 
     private void startTurnTimer() {

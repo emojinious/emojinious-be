@@ -1,14 +1,18 @@
 package com.emojinious.emojinious_backend.service;
 
-import com.emojinious.emojinious_backend.cache.PlayerSessionCache;
 import com.emojinious.emojinious_backend.dto.GameSettingsDto;
+import com.emojinious.emojinious_backend.cache.Player;
+import com.emojinious.emojinious_backend.model.GameSession;
+import com.emojinious.emojinious_backend.model.GameSettings;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class GameSessionService {
@@ -21,11 +25,11 @@ public class GameSessionService {
             throw new IllegalArgumentException("Player not found");
         }
 
-        PlayerSessionCache player;
-        if (playerData instanceof PlayerSessionCache) {
-            player = (PlayerSessionCache) playerData;
+        Player player;
+        if (playerData instanceof Player) {
+            player = (Player) playerData;
         } else if (playerData instanceof Map) {
-            player = objectMapper.convertValue(playerData, PlayerSessionCache.class);
+            player = objectMapper.convertValue(playerData, Player.class);
         } else {
             throw new IllegalArgumentException("Invalid player data format");
         }
@@ -41,5 +45,15 @@ public class GameSessionService {
                 "difficulty", settings.getDifficulty(),
                 "turns", settings.getTurns()
         ));
+
+        GameSession gameSession = (GameSession) redisTemplate.opsForValue().get("game:session:" + sessionId);
+        if (gameSession != null) {
+            GameSettings gameSettings = gameSession.getSettings();
+            gameSettings.setPromptTimeLimit(settings.getPromptTimeLimit());
+            gameSettings.setGuessTimeLimit(settings.getGuessTimeLimit());
+            gameSettings.setDifficulty(settings.getDifficulty());
+            gameSettings.setTurns(settings.getTurns());
+            redisTemplate.opsForValue().set("game:session:" + sessionId, gameSession);
+        }
     }
 }

@@ -1,6 +1,6 @@
 package com.emojinious.emojinious_backend.controller;
 
-import com.emojinious.emojinious_backend.model.Player;
+import com.emojinious.emojinious_backend.cache.Player;
 import com.emojinious.emojinious_backend.dto.PlayerCreateRequest;
 import com.emojinious.emojinious_backend.service.PlayerService;
 import jakarta.validation.Valid;
