@@ -18,6 +18,10 @@ public class GameSession implements Serializable {
     private long turnStartTime;
     private long turnEndTime;
 
+    public GameSession() {
+        // 역직렬화 문제
+    }
+
     public GameSession(String sessionId) {
         this.sessionId = sessionId;
         this.players = new ArrayList<>();
@@ -72,6 +76,7 @@ public class GameSession implements Serializable {
 
     private void generateKeywords() {
         // Logic to generate and assign keywords to players
+        // ha...tlqkf
     }
 
     private void startTurnTimer() {
