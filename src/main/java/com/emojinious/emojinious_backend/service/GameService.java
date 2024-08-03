@@ -5,6 +5,7 @@ import com.emojinious.emojinious_backend.dto.*;
 import com.emojinious.emojinious_backend.model.*;
 import com.emojinious.emojinious_backend.constant.GameState;
 import com.emojinious.emojinious_backend.util.JwtUtil;
+import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -121,6 +122,17 @@ public class GameService {
         if (gameSession == null) {
             throw new IllegalStateException("Game session not found");
         }
+
+        Object settings = redisTemplate.opsForHash().entries("game:settings:" + sessionId);
+        if (settings instanceof Map) {
+            Map<Object, Object> settingsMap = (Map<Object, Object>) settings;
+            GameSettings gameSettings = gameSession.getSettings();
+            gameSettings.setPromptTimeLimit((Integer) settingsMap.get("promptTimeLimit"));
+            gameSettings.setGuessTimeLimit((Integer) settingsMap.get("guessTimeLimit"));
+            gameSettings.setDifficulty((String) settingsMap.get("difficulty"));
+            gameSettings.setTurns((Integer) settingsMap.get("turns"));
+        }
+
         return gameSession;
     }
 

@@ -2,6 +2,8 @@ package com.emojinious.emojinious_backend.service;
 
 import com.emojinious.emojinious_backend.dto.GameSettingsDto;
 import com.emojinious.emojinious_backend.cache.Player;
+import com.emojinious.emojinious_backend.model.GameSession;
+import com.emojinious.emojinious_backend.model.GameSettings;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -43,5 +45,15 @@ public class GameSessionService {
                 "difficulty", settings.getDifficulty(),
                 "turns", settings.getTurns()
         ));
+
+        GameSession gameSession = (GameSession) redisTemplate.opsForValue().get("game:session:" + sessionId);
+        if (gameSession != null) {
+            GameSettings gameSettings = gameSession.getSettings();
+            gameSettings.setPromptTimeLimit(settings.getPromptTimeLimit());
+            gameSettings.setGuessTimeLimit(settings.getGuessTimeLimit());
+            gameSettings.setDifficulty(settings.getDifficulty());
+            gameSettings.setTurns(settings.getTurns());
+            redisTemplate.opsForValue().set("game:session:" + sessionId, gameSession);
+        }
     }
 }

@@ -37,11 +37,12 @@ public class GameSessionController {
 
         try {
             gameSessionService.updateGameSettings(sessionId, playerId, settings);
-            System.out.println("settings = " + settings);
+//            System.out.println("settings = " + settings);
             GameStateDto updatedGameState = gameService.getGameState(sessionId);
-            System.out.println("updatedGameState = " + updatedGameState);
+//            System.out.println("updatedGameState = " + updatedGameState);
             messagingTemplate.convertAndSend("/topic/game/" + sessionId, updatedGameState);
             return ResponseEntity.ok().body("Settings updated successfully");
+
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         } catch (Exception e) {
