@@ -13,7 +13,7 @@ import java.util.stream.Collectors;
 public class GenerateKeywordService {
     private final RestTemplate restTemplate;
     private static final String API_URL = "https://api.openai.com/v1/chat/completions";
-    private static final String API_KEY = "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";
+    private static final String API_KEY = "";
 
     public GenerateKeywordService(RestTemplate restTemplate) {
         this.restTemplate = restTemplate;
