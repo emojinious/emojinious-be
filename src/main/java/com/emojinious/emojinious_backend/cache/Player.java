@@ -2,6 +2,8 @@ package com.emojinious.emojinious_backend.cache;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.io.Serializable;
+import java.util.Map;
+
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
@@ -20,6 +22,7 @@ public class Player implements Serializable {
     private int score;
     private String token;
     private String sessionId;
+
 
     public Player(String id, String nickname, int characterId, boolean isHost) {
         this.id = id;

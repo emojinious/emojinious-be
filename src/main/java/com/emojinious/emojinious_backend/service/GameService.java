@@ -5,6 +5,9 @@ import com.emojinious.emojinious_backend.dto.*;
 import com.emojinious.emojinious_backend.model.*;
 import com.emojinious.emojinious_backend.constant.GameState;
 import com.emojinious.emojinious_backend.util.JwtUtil;
+
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +24,7 @@ public class GameService {
     private final SimpMessagingTemplate messagingTemplate;
     private final PlayerService playerService;
     private final JwtUtil jwtUtil;
+    private final GenerateKeywordService generateKeywordService;
 
     public GameStateDto joinGame(String sessionId, String playerId, String nickname) {
         GameSession gameSession = getOrCreateGameSession(sessionId);
@@ -56,7 +60,6 @@ public class GameService {
         }
     }
 
-
     public GameStateDto startGame(String sessionId, String playerId) {
         GameSession gameSession = getGameSession(sessionId);
         if (!gameSession.isHost(playerId)) {
@@ -67,6 +70,17 @@ public class GameService {
         broadcastGameState(gameSession);
         scheduleNextTurn(sessionId);
         return createGameStateDto(gameSession);
+    }
+
+    public void generateKeywords(GameSession gameSession) {
+        List<String> keywords = generateKeywordService.getKeywordsFromTheme(gameSession.getSettings().getTheme(), gameSession.getPlayers().size());
+        gameSession.getCurrentKeywords().clear();
+        for (int i = 0; i < gameSession.getPlayers().size(); i++) {
+            Player player = gameSession.getPlayers().get(i);
+            if (i < keywords.size()) {
+                gameSession.getCurrentKeywords().put(player.getId(), keywords.get(i));
+            }
+        }
     }
 
     public GameStateDto submitPrompt(String sessionId, String playerId, String prompt) {
@@ -117,7 +131,7 @@ public class GameService {
         return gameSession;
     }
 
-    private GameSession getGameSession(String sessionId) {
+    public GameSession getGameSession(String sessionId) {
         GameSession gameSession = (GameSession) redisTemplate.opsForValue().get("game:session:" + sessionId);
         if (gameSession == null) {
             throw new IllegalStateException("Game session not found");
@@ -127,12 +141,13 @@ public class GameService {
         if (settings instanceof Map) {
             Map<Object, Object> settingsMap = (Map<Object, Object>) settings;
             GameSettings gameSettings = gameSession.getSettings();
-            gameSettings.setPromptTimeLimit((Integer) settingsMap.get("promptTimeLimit"));
-            gameSettings.setGuessTimeLimit((Integer) settingsMap.get("guessTimeLimit"));
-            gameSettings.setDifficulty((String) settingsMap.get("difficulty"));
-            gameSettings.setTurns((Integer) settingsMap.get("turns"));
-        }
 
+            gameSettings.setPromptTimeLimit(settingsMap.get("promptTimeLimit") != null ? (Integer) settingsMap.get("promptTimeLimit") : 30); // 기본값 설정
+            gameSettings.setGuessTimeLimit(settingsMap.get("guessTimeLimit") != null ? (Integer) settingsMap.get("guessTimeLimit") : 30); // 기본값 설정
+            gameSettings.setDifficulty(settingsMap.get("difficulty") != null ? (String) settingsMap.get("difficulty") : "NORMAL"); // 기본값 설정
+            gameSettings.setTurns(settingsMap.get("turns") != null ? (Integer) settingsMap.get("turns") : 3); // 기본값 설정
+            gameSettings.setTheme(settingsMap.get("theme") != null ? (String) settingsMap.get("theme") : "movie"); // 기본값 설정
+        }
         return gameSession;
     }
 
@@ -181,6 +196,7 @@ public class GameService {
         dto.setGuessTimeLimit(settings.getGuessTimeLimit());
         dto.setDifficulty(settings.getDifficulty());
         dto.setTurns(settings.getTurns());
+        dto.setTheme(settings.getTheme());
         return dto;
     }
 

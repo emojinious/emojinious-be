@@ -2,6 +2,8 @@ package com.emojinious.emojinious_backend.model;
 
 import com.emojinious.emojinious_backend.cache.Player;
 import com.emojinious.emojinious_backend.constant.GameState;
+import com.emojinious.emojinious_backend.service.GameService;
+import com.emojinious.emojinious_backend.service.GenerateKeywordService;
 import lombok.Data;
 import java.io.Serializable;
 import java.util.*;
@@ -51,9 +53,9 @@ public class GameSession implements Serializable {
         }
         state = GameState.IN_PROGRESS;
         currentTurn = 1;
-        generateKeywords();
         startTurnTimer();
     }
+
 
     public void submitPrompt(String playerId, String prompt) {
         if (state != GameState.IN_PROGRESS) {
@@ -73,11 +75,6 @@ public class GameSession implements Serializable {
         if (currentGuesses.size() == players.size()) {
             moveToNextTurn();
         }
-    }
-
-    private void generateKeywords() {
-        // Logic to generate and assign keywords to players
-        // ha...tlqkf
     }
 
     private void startTurnTimer() {

@@ -8,4 +8,5 @@ public class GameSettingsDto {
     private Integer guessTimeLimit;
     private String difficulty;
     private Integer turns;
+    private String theme;
 }

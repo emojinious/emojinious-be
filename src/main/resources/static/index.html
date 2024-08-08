@@ -37,6 +37,9 @@
 <h2>게임 제어</h2>
 <button onclick="startGame()">게임 시작</button>
 
+<h2>키워드 생성</h2>
+<button onclick="getKeywords()">키워드 생성</button>
+
 <h2>프롬프트 및 추측 제출</h2>
 <input type="text" id="prompt" placeholder="프롬프트">
 <button onclick="submitPrompt()">프롬프트 제출</button>
@@ -166,7 +169,8 @@
             promptTimeLimit: document.getElementById('promptTimeLimit').value,
             guessTimeLimit: document.getElementById('guessTimeLimit').value,
             difficulty: document.getElementById('difficulty').value,
-            turns: document.getElementById('turns').value
+            turns: document.getElementById('turns').value,
+            theme: document.getElementById('theme').value
         };
         fetch(`/api/sessions/${sessionId}/settings`, {
             method: 'PUT',
@@ -186,6 +190,11 @@
     function startGame() {
         stompClient.send(`/app/game/${sessionId}/start`, {}, JSON.stringify({}));
         logRequestResponse('STOMP', `/app/game/${sessionId}/start`, {}, 'Message sent');
+    }
+
+    function getKeywords() {
+        stompClient.send(`/app/game/${sessionId}/getKeywords`, {}, JSON.stringify({}));
+        logRequestResponse('STOMP', `/app/game/${sessionId}/getKeywords`, {}, gameSession);
     }
 
     function submitPrompt() {

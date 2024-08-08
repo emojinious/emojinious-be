@@ -43,7 +43,8 @@ public class GameSessionService {
                 "promptTimeLimit", settings.getPromptTimeLimit(),
                 "guessTimeLimit", settings.getGuessTimeLimit(),
                 "difficulty", settings.getDifficulty(),
-                "turns", settings.getTurns()
+                "turns", settings.getTurns(),
+                "theme", settings.getTheme()
         ));
 
         GameSession gameSession = (GameSession) redisTemplate.opsForValue().get("game:session:" + sessionId);
@@ -53,6 +54,7 @@ public class GameSessionService {
             gameSettings.setGuessTimeLimit(settings.getGuessTimeLimit());
             gameSettings.setDifficulty(settings.getDifficulty());
             gameSettings.setTurns(settings.getTurns());
+            gameSettings.setTheme(settings.getTheme());
             redisTemplate.opsForValue().set("game:session:" + sessionId, gameSession);
         }
     }

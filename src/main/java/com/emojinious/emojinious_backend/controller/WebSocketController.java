@@ -2,6 +2,7 @@ package com.emojinious.emojinious_backend.controller;
 
 import com.emojinious.emojinious_backend.dto.*;
 import com.emojinious.emojinious_backend.cache.Player;
+import com.emojinious.emojinious_backend.model.GameSession;
 import com.emojinious.emojinious_backend.service.GameService;
 import com.emojinious.emojinious_backend.service.PlayerService;
 import com.emojinious.emojinious_backend.util.JwtUtil;
@@ -14,6 +15,10 @@ import org.springframework.messaging.handler.annotation.SendTo;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
 import org.springframework.messaging.simp.annotation.SendToUser;
 import org.springframework.stereotype.Controller;
+
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Controller
 @RequiredArgsConstructor
@@ -69,6 +74,14 @@ public class WebSocketController {
                                   SimpMessageHeaderAccessor headerAccessor) {
         String playerId = (String) headerAccessor.getSessionAttributes().get("playerId");
         return gameService.startGame(sessionId, playerId);
+    }
+
+    @MessageMapping("/game/{sessionId}/getKeywords")
+    @SendTo("/topic/game/{sessionId}")
+    public GameSession requestKeywords(@DestinationVariable String sessionId) {
+        GameSession gameSession = gameService.getGameSession(sessionId);
+        gameService.generateKeywords(gameSession);
+        return gameSession;
     }
 
     @MessageMapping("/game/{sessionId}/prompt")
