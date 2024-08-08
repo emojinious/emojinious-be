@@ -6,6 +6,8 @@ import com.emojinious.emojinious_backend.model.*;
 import com.emojinious.emojinious_backend.constant.GamePhase;
 import com.emojinious.emojinious_backend.constant.GameState;
 import com.emojinious.emojinious_backend.util.JwtUtil;
+import com.emojinious.emojinious_backend.util.RedisUtil;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -19,13 +21,16 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class GameService {
-    private final RedisTemplate<String, Object> redisTemplate;
+    private final RedisTemplate<String, String> redisTemplate;
+    private final RedisUtil redisUtil;
     private final SimpMessagingTemplate messagingTemplate;
     private final PlayerService playerService;
     private final JwtUtil jwtUtil;
     private final RandomWordGenerator randomWordGenerator;
     private final ImageGenerator imageGenerator;
     private final ScoreCalculator scoreCalculator;
+
+    private static final String GAME_SESSION_KEY = "game:session:";
 
     public GameStateDto joinGame(String sessionId, String playerId, String nickname) {
         GameSession gameSession = getOrCreateGameSession(sessionId);
@@ -136,15 +141,12 @@ public class GameService {
     }
 
     private GameSession getOrCreateGameSession(String sessionId) {
-        GameSession gameSession = (GameSession) redisTemplate.opsForValue().get("game:session:" + sessionId);
-        if (gameSession == null) {
-            gameSession = new GameSession(sessionId);
-        }
-        return gameSession;
+        GameSession gameSession = redisUtil.get(GAME_SESSION_KEY + sessionId, GameSession.class);
+        return gameSession != null ? gameSession : new GameSession(sessionId);
     }
 
     private GameSession getGameSession(String sessionId) {
-        GameSession gameSession = (GameSession) redisTemplate.opsForValue().get("game:session:" + sessionId);
+        GameSession gameSession = redisUtil.get(GAME_SESSION_KEY + sessionId, GameSession.class);
         if (gameSession == null) {
             throw new IllegalStateException("Game session not found");
         }
@@ -152,7 +154,7 @@ public class GameService {
     }
 
     private void updateGameSession(GameSession gameSession) {
-        redisTemplate.opsForValue().set("game:session:" + gameSession.getSessionId(), gameSession);
+        redisUtil.set(GAME_SESSION_KEY + gameSession.getSessionId(), gameSession);
     }
 
     private void broadcastGameState(GameSession gameSession) {

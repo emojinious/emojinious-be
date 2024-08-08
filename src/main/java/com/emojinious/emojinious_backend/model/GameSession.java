@@ -3,11 +3,13 @@ package com.emojinious.emojinious_backend.model;
 import com.emojinious.emojinious_backend.cache.Player;
 import com.emojinious.emojinious_backend.constant.GamePhase;
 import com.emojinious.emojinious_backend.constant.GameState;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Data;
 import java.io.Serializable;
 import java.util.*;
 
 @Data
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class GameSession implements Serializable {
     private String sessionId;
     private List<Player> players;
