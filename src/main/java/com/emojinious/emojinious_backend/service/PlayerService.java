@@ -96,6 +96,6 @@ public class PlayerService {
     }
 
     public String generateInviteLink(String sessionId) {
-        return "localhost:8080/?sessionId=" + sessionId;
+        return "http://localhost:3000/join?sessionId=" + sessionId;
     }
 }

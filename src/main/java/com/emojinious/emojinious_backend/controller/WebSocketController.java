@@ -1,7 +1,7 @@
 package com.emojinious.emojinious_backend.controller;
 
-import com.emojinious.emojinious_backend.dto.*;
 import com.emojinious.emojinious_backend.cache.Player;
+import com.emojinious.emojinious_backend.dto.*;
 import com.emojinious.emojinious_backend.service.GameService;
 import com.emojinious.emojinious_backend.service.PlayerService;
 import com.emojinious.emojinious_backend.util.JwtUtil;
@@ -90,14 +90,13 @@ public class WebSocketController {
     }
 
     @MessageMapping("/game/{sessionId}/chat")
-    @SendTo("/topic/game/{sessionId}/chat")
-    public ChatMessage sendChatMessage(@DestinationVariable String sessionId,
-                                       @Payload ChatMessage message,
-                                       SimpMessageHeaderAccessor headerAccessor) {
+    public void sendChatMessage(@DestinationVariable String sessionId,
+                                @Payload ChatMessage message,
+                                SimpMessageHeaderAccessor headerAccessor) {
         String playerId = (String) headerAccessor.getSessionAttributes().get("playerId");
         String nickname = (String) headerAccessor.getSessionAttributes().get("nickname");
         message.setPlayerId(playerId);
         message.setSender(nickname);
-        return message;
+        gameService.broadcastChatMessage(sessionId, message);
     }
 }

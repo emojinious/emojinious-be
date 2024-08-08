@@ -6,10 +6,10 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.core.RedisTemplate;
 import static org.junit.jupiter.api.Assertions.*;
 
+
 @SpringBootTest
 public class RedisConnectionTest {
 
-    @Autowired
     private RedisTemplate<String, Object> redisTemplate;
 
     @Test
