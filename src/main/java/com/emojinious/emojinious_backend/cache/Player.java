@@ -17,7 +17,7 @@ public class Player implements Serializable {
     private int characterId;
     @JsonProperty("isHost")
     private boolean isHost;
-    private int score;
+    private Integer score;
     private String token;
     private String sessionId;
 

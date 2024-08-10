@@ -12,7 +12,7 @@ public class ImageGenerator {
         RestTemplate restTemplate = new RestTemplate();
         String requestBody = "{\"text_prompts\": [{\"text\": \"" + prompt + "\"}]}";
 
-        String response = restTemplate.postForObject(STABLE_DIFFUSION_API_URL, requestBody, String.class);
+        // String response = restTemplate.postForObject(STABLE_DIFFUSION_API_URL, requestBody, String.class);
         // 어케 쓰는지 몰름 걍 대충
 
         // imgur api나 올려서 링크만 전달

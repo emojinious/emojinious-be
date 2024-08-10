@@ -59,6 +59,7 @@ public class GameService {
     public GameStateDto submitPrompt(String sessionId, String playerId, String prompt) {
         GameSession gameSession = getGameSession(sessionId);
         gameSession.submitPrompt(playerId, prompt);
+        updateSubmissionProgress(gameSession, "prompt");
         if (gameSession.getCurrentPrompts().size() == gameSession.getPlayers().size()) {
             startGenerationPhase(gameSession);
         }
@@ -70,6 +71,7 @@ public class GameService {
     public GameStateDto submitGuess(String sessionId, String playerId, String guess) {
         GameSession gameSession = getGameSession(sessionId);
         gameSession.submitGuess(playerId, guess);
+        updateSubmissionProgress(gameSession, "guess");
         if (gameSession.getCurrentGuesses().size() == gameSession.getPlayers().size()) {
             moveToNextPhase(gameSession);
         }
@@ -85,18 +87,22 @@ public class GameService {
         gameSession.getPlayers().forEach(player ->
                 sendToPlayer(gameSession.getSessionId(), player.getId(), "keyword", keywords.get(player.getId())));
         broadcastGameState(gameSession);
+        broadcastPhaseStartMessage(gameSession, "설명 페이즈가 시작되었습니다. 키워드를 확인하고 프롬프트를 작성해주세요.");
     }
 
     private void startGenerationPhase(GameSession gameSession) {
         gameSession.setCurrentPhase(GamePhase.GENERATION);
+        broadcastGameState(gameSession);
+        broadcastPhaseStartMessage(gameSession, "생성 페이즈가 시작되었습니다. 이미지 생성 중입니다.");
+
         gameSession.getCurrentPrompts().forEach((playerId, prompt) -> {
             String imageUrl = imageGenerator.generateImage(prompt);
             gameSession.setGeneratedImage(playerId, imageUrl);
         });
+
         if (gameSession.areAllImagesGenerated()) {
             startGuessingPhase(gameSession);
         }
-        broadcastGameState(gameSession);
     }
 
     private void startGuessingPhase(GameSession gameSession) {
@@ -106,6 +112,7 @@ public class GameService {
             sendToPlayer(gameSession.getSessionId(), player.getId(), "image", imageUrl);
         });
         broadcastGameState(gameSession);
+        broadcastPhaseStartMessage(gameSession, "추측 페이즈가 시작되었습니다. 이미지를 보고 키워드를 추측해주세요.");
     }
 
     private void moveToNextPhase(GameSession gameSession) {
@@ -128,16 +135,31 @@ public class GameService {
 
     private void endGame(GameSession gameSession) {
         gameSession.setState(GameState.FINISHED);
+        gameSession.setCurrentPhase(GamePhase.RESULT);
         Map<String, Integer> scores = scoreCalculator.calculateScores(gameSession);
         gameSession.getPlayers().forEach(player ->
                 player.setScore(scores.get(player.getId())));
         broadcastGameState(gameSession);
-        redisTemplate.delete("game:session:" + gameSession.getSessionId());
+        broadcastPhaseStartMessage(gameSession, "게임이 종료되었습니다. 결과를 확인해주세요.");
+        // 결과 데이터 전송
+        messagingTemplate.convertAndSend("/topic/game/" + gameSession.getSessionId() + "/result", scores);
+        redisTemplate.delete(GAME_SESSION_KEY + gameSession.getSessionId());
     }
 
     @Scheduled(fixedRate = 1000)
     public void checkPhaseTimeouts() {
-        // TODO: 페이즈 타임아웃 구현.ㅇ
+        List<String> sessionIds = redisTemplate.keys(GAME_SESSION_KEY + "*").stream()
+                .map(key -> key.replace(GAME_SESSION_KEY, ""))
+                .collect(Collectors.toList());
+
+        for (String sessionId : sessionIds) {
+            GameSession gameSession = getGameSession(sessionId);
+            if (gameSession.getState() == GameState.IN_PROGRESS && gameSession.isPhaseTimedOut()) {
+                moveToNextPhase(gameSession);
+                updateGameSession(gameSession);
+                broadcastGameState(gameSession);
+            }
+        }
     }
 
     private GameSession getOrCreateGameSession(String sessionId) {
@@ -257,4 +279,18 @@ public class GameService {
         GameSession gameSession = getGameSession(sessionId);
         return createGameStateDto(gameSession);
     }
+
+    private void updateSubmissionProgress(GameSession gameSession, String type) {
+        int submitted = type.equals("prompt") ? gameSession.getCurrentPrompts().size() : gameSession.getCurrentGuesses().size();
+        int total = gameSession.getPlayers().size();
+        messagingTemplate.convertAndSend("/topic/game/" + gameSession.getSessionId() + "/progress",
+                Map.of("type", type, "submitted", submitted, "total", total));
+    }
+
+    private void broadcastPhaseStartMessage(GameSession gameSession, String message) {
+        messagingTemplate.convertAndSend("/topic/game/" + gameSession.getSessionId() + "/phase",
+                Map.of("phase", gameSession.getCurrentPhase(), "message", message));
+    }
+
+
 }

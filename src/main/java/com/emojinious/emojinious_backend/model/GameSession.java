@@ -25,7 +25,7 @@ public class GameSession implements Serializable {
     private long phaseEndTime;
 
     public GameSession() {
-        // 역직렬화 문제 방지
+        // 역직렬화 문제 방지, 이제필요없음(아마도)
     }
 
     public GameSession(String sessionId) {
@@ -88,18 +88,20 @@ public class GameSession implements Serializable {
         startPhaseTimer();
     }
 
-    private void startPhaseTimer() {
+    public void startPhaseTimer() {
         phaseStartTime = System.currentTimeMillis();
         switch (currentPhase) {
             case DESCRIPTION:
+                phaseEndTime = phaseStartTime + (settings.getPromptTimeLimit() * 1000L);
+                break;
             case GUESSING:
-                phaseEndTime = phaseStartTime + (settings.getPromptTimeLimit() * 1000);
+                phaseEndTime = phaseStartTime + (settings.getGuessTimeLimit() * 1000L);
                 break;
             case GENERATION:
-                phaseEndTime = phaseStartTime + 30000; // Assuming 30 seconds for image generation
+                phaseEndTime = phaseStartTime + 10000; // 10초
                 break;
             default:
-                phaseEndTime = phaseStartTime + 60000; // Default 1 minute for other phases
+                phaseEndTime = phaseStartTime + 10000; // 10초
         }
     }
 
