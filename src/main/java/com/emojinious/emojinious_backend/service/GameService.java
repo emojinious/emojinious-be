@@ -25,6 +25,7 @@ public class GameService {
     private final PlayerService playerService;
     private final JwtUtil jwtUtil;
     private final GenerateKeywordService generateKeywordService;
+    private final GenerateImageService generateImageService;
 
     public GameStateDto joinGame(String sessionId, String playerId, String nickname) {
         GameSession gameSession = getOrCreateGameSession(sessionId);
@@ -81,18 +82,21 @@ public class GameService {
                 gameSession.getCurrentKeywords().put(player.getId(), keywords.get(i));
             }
         }
+        updateGameSession(gameSession);
     }
 
-    public GameStateDto submitPrompt(String sessionId, String playerId, String prompt) {
+    public void submitPrompt(String sessionId, String playerId, String message) {
         GameSession gameSession = getGameSession(sessionId);
-        gameSession.submitPrompt(playerId, prompt);
-        updateGameSession(gameSession);
+        gameSession.submitPrompt(playerId, message);
+        String image = generateImageService.getImagesFromMessage(message);
+        gameSession.saveImage(playerId, image);
+
         if (gameSession.getCurrentPrompts().size() == gameSession.getPlayers().size()) {
             gameSession.moveToGuessingPhase();
             scheduleNextTurn(sessionId);
         }
+        updateGameSession(gameSession);
         broadcastGameState(gameSession);
-        return createGameStateDto(gameSession);
     }
 
     public GameStateDto submitGuess(String sessionId, String playerId, String guess) {
@@ -203,7 +207,22 @@ public class GameService {
     private void scheduleNextTurn(String sessionId) {
         GameSession gameSession = getGameSession(sessionId);
         long delay = gameSession.getTurnEndTime() - System.currentTimeMillis();
-        redisTemplate.opsForValue().set("game:turn:" + sessionId, true, delay, TimeUnit.MILLISECONDS);
+
+        // delay 값이 0보다 큰지 확인
+        if (delay > 0) {
+            redisTemplate.opsForValue().set("game:turn:" + sessionId, true, delay, TimeUnit.MILLISECONDS);
+        } else {
+            // delay가 0 이하일 경우, 기본 값을 설정하거나 예외를 던질 수 있습니다.
+            // 기본값으로 1초(1000ms)를 설정하거나 필요한 경우 맞춤 처리를 추가하세요.
+            delay = 60000; // 기본값 설정 (예: 1초)
+            redisTemplate.opsForValue().set("game:turn:" + sessionId, true, delay, TimeUnit.MILLISECONDS);
+
+            // 또는 예외를 던질 수도 있습니다.
+            // throw new IllegalStateException("Calculated delay time is invalid: " + delay);
+        }
+
+
+//        redisTemplate.opsForValue().set("game:turn:" + sessionId, true, delay, TimeUnit.MILLISECONDS);
     }
 
     private void endGame(String sessionId) {

@@ -86,11 +86,13 @@ public class WebSocketController {
 
     @MessageMapping("/game/{sessionId}/prompt")
     @SendTo("/topic/game/{sessionId}")
-    public GameStateDto submitPrompt(@DestinationVariable String sessionId,
+    public GameSession submitPrompt(@DestinationVariable String sessionId,
                                      @Payload PromptSubmissionMessage message,
                                      SimpMessageHeaderAccessor headerAccessor) {
+        GameSession gameSession = gameService.getGameSession(sessionId);
         String playerId = (String) headerAccessor.getSessionAttributes().get("playerId");
-        return gameService.submitPrompt(sessionId, playerId, message.getPrompt());
+        gameService.submitPrompt(sessionId, playerId, message.getPrompt());
+        return gameSession;
     }
 
     @MessageMapping("/game/{sessionId}/guess")

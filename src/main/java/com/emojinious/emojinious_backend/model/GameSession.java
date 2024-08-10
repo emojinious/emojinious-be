@@ -18,6 +18,7 @@ public class GameSession implements Serializable {
     private Map<String, String> currentPrompts;
     private Map<String, String> currentGuesses;
     private Map<String, String> currentKeywords;
+    private Map<String, String> currentImages;
     private long turnStartTime;
     private long turnEndTime;
 
@@ -34,6 +35,7 @@ public class GameSession implements Serializable {
         this.currentPrompts = new HashMap<>();
         this.currentGuesses = new HashMap<>();
         this.currentKeywords = new HashMap<>();
+        this.currentImages = new HashMap<>();
     }
 
     public void addPlayer(Player player) {
@@ -58,13 +60,17 @@ public class GameSession implements Serializable {
 
 
     public void submitPrompt(String playerId, String prompt) {
-        if (state != GameState.IN_PROGRESS) {
-            throw new IllegalStateException("Game is not in progress");
-        }
+//        if (state != GameState.IN_PROGRESS) {
+//            throw new IllegalStateException("Game is not in progress");
+//        }
         currentPrompts.put(playerId, prompt);
-        if (currentPrompts.size() == players.size()) {
-            moveToGuessingPhase();
-        }
+    }
+
+    public void saveImage(String playerId, String image) {
+//        if (state != GameState.IN_PROGRESS) {
+//            throw new IllegalStateException("Game is not in progress");
+//        }
+        currentImages.put(playerId, image);
     }
 
     public void submitGuess(String playerId, String guess) {

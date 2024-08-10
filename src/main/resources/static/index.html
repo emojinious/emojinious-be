@@ -193,14 +193,16 @@
     }
 
     function getKeywords() {
+
         stompClient.send(`/app/game/${sessionId}/getKeywords`, {}, JSON.stringify({}));
-        logRequestResponse('STOMP', `/app/game/${sessionId}/getKeywords`, {}, gameSession);
+        // logRequestResponse('STOMP', `/app/game/${sessionId}/getKeywords`, {}, 'Message sent' );
     }
+
 
     function submitPrompt() {
         const prompt = document.getElementById('prompt').value;
         stompClient.send(`/app/game/${sessionId}/prompt`, {}, JSON.stringify({ prompt }));
-        logRequestResponse('STOMP', `/app/game/${sessionId}/prompt`, { prompt }, 'Message sent');
+        // logRequestResponse('STOMP', `/app/game/${sessionId}/prompt`, { prompt }, 'Message sent');
     }
 
     function submitGuess() {
