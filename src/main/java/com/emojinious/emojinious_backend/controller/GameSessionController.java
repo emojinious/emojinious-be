@@ -4,11 +4,11 @@ import com.emojinious.emojinious_backend.dto.GameSettingsDto;
 import com.emojinious.emojinious_backend.dto.GameStateDto;
 import com.emojinious.emojinious_backend.service.GameSessionService;
 import com.emojinious.emojinious_backend.service.GameService;
-import io.jsonwebtoken.Claims;
 import com.emojinious.emojinious_backend.util.JwtUtil;
+import com.emojinious.emojinious_backend.util.MessageUtil;
+import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -18,7 +18,7 @@ public class GameSessionController {
     private final GameSessionService gameSessionService;
     private final GameService gameService;
     private final JwtUtil jwtUtil;
-    private final SimpMessagingTemplate messagingTemplate;
+    private final MessageUtil messageUtil;
 
     @PutMapping("/{sessionId}/settings")
     public ResponseEntity<?> updateGameSettings(
@@ -37,10 +37,8 @@ public class GameSessionController {
 
         try {
             gameSessionService.updateGameSettings(sessionId, playerId, settings);
-//            System.out.println("settings = " + settings);
             GameStateDto updatedGameState = gameService.getGameState(sessionId);
-//            System.out.println("updatedGameState = " + updatedGameState);
-            messagingTemplate.convertAndSend("/topic/game/" + sessionId, updatedGameState);
+            messageUtil.broadcastGameState(sessionId, updatedGameState);
             return ResponseEntity.ok().body("Settings updated successfully");
 
         } catch (IllegalArgumentException e) {

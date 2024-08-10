@@ -4,6 +4,7 @@ public enum GamePhase {
     WAITING,
     DESCRIPTION,
     GENERATION,
+    CHECKING,
     GUESSING,
     RESULT
 }

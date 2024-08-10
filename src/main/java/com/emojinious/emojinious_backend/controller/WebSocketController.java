@@ -37,6 +37,9 @@ public class WebSocketController {
                 Player player = playerService.getPlayerById(playerId);
 
                 if (player != null) {
+                    player.setSocketId(headerAccessor.getSessionId());
+                    playerService.savePlayer(player);
+                    headerAccessor.getSessionAttributes().put("player", player);
                     headerAccessor.getSessionAttributes().put("playerId", playerId);
                     headerAccessor.getSessionAttributes().put("sessionId", claims.get("sessionId", String.class));
                     headerAccessor.getSessionAttributes().put("nickname", player.getNickname());
