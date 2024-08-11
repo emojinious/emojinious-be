@@ -7,14 +7,13 @@ import com.emojinious.emojinious_backend.constant.GamePhase;
 import com.emojinious.emojinious_backend.constant.GameState;
 import com.emojinious.emojinious_backend.util.JwtUtil;
 import com.emojinious.emojinious_backend.util.RedisUtil;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.util.List;
+import com.emojinious.emojinious_backend.util.MessageUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.scheduling.annotation.Scheduled;
 
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -23,7 +22,7 @@ import java.util.stream.Collectors;
 public class GameService {
     private final RedisTemplate<String, String> redisTemplate;
     private final RedisUtil redisUtil;
-    private final SimpMessagingTemplate messagingTemplate;
+    private final MessageUtil messageUtil;
     private final PlayerService playerService;
     private final JwtUtil jwtUtil;
     private final RandomWordGenerator randomWordGenerator;
@@ -35,13 +34,9 @@ public class GameService {
     public GameStateDto joinGame(String sessionId, String playerId, String nickname) {
         GameSession gameSession = getOrCreateGameSession(sessionId);
         Player player = playerService.getPlayerById(playerId);
-        if (player == null) {
-            player = new Player(playerId, nickname, 0, gameSession.getPlayers().isEmpty());
-            playerService.savePlayer(player);
-        }
         gameSession.addPlayer(player);
         updateGameSession(gameSession);
-        broadcastGameState(gameSession);
+        messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
         return createGameStateDto(gameSession);
     }
 
@@ -64,7 +59,7 @@ public class GameService {
             startGenerationPhase(gameSession);
         }
         updateGameSession(gameSession);
-        broadcastGameState(gameSession);
+        messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
         return createGameStateDto(gameSession);
     }
 
@@ -76,24 +71,25 @@ public class GameService {
             moveToNextPhase(gameSession);
         }
         updateGameSession(gameSession);
-        broadcastGameState(gameSession);
+        messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
         return createGameStateDto(gameSession);
     }
 
     private void startDescriptionPhase(GameSession gameSession) {
         gameSession.setCurrentPhase(GamePhase.DESCRIPTION);
-        Map<String, String> keywords = randomWordGenerator.generateKeywords(gameSession.getPlayers().size());
+        messageUtil.broadcastPhaseStartMessage(gameSession.getSessionId(), gameSession.getCurrentPhase(), "KeyWord Generation");
+        Map<String, String> keywords = randomWordGenerator.generateKeywords(gameSession.getPlayers());
         gameSession.setCurrentKeywords(keywords);
         gameSession.getPlayers().forEach(player ->
-                sendToPlayer(gameSession.getSessionId(), player.getId(), "keyword", keywords.get(player.getId())));
-        broadcastGameState(gameSession);
-        broadcastPhaseStartMessage(gameSession, "설명 페이즈가 시작되었습니다. 키워드를 확인하고 프롬프트를 작성해주세요.");
+                messageUtil.sendToPlayer(gameSession.getSessionId(), player.getSocketId(), "keyword", keywords.get(player.getId())));
+        messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
+        messageUtil.broadcastPhaseStartMessage(gameSession.getSessionId(), gameSession.getCurrentPhase(), "Description Phase");
     }
 
     private void startGenerationPhase(GameSession gameSession) {
         gameSession.setCurrentPhase(GamePhase.GENERATION);
-        broadcastGameState(gameSession);
-        broadcastPhaseStartMessage(gameSession, "생성 페이즈가 시작되었습니다. 이미지 생성 중입니다.");
+        messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
+        messageUtil.broadcastPhaseStartMessage(gameSession.getSessionId(), gameSession.getCurrentPhase(), "생성 페이즈가 시작되었습니다. 이미지 생성 중입니다.");
 
         gameSession.getCurrentPrompts().forEach((playerId, prompt) -> {
             String imageUrl = imageGenerator.generateImage(prompt);
@@ -109,10 +105,10 @@ public class GameService {
         gameSession.setCurrentPhase(GamePhase.GUESSING);
         gameSession.getPlayers().forEach(player -> {
             String imageUrl = getNextImageForPlayer(gameSession, player.getId());
-            sendToPlayer(gameSession.getSessionId(), player.getId(), "image", imageUrl);
+            messageUtil.sendToPlayer(gameSession.getSessionId(), player.getSocketId(), "image", imageUrl);
         });
-        broadcastGameState(gameSession);
-        broadcastPhaseStartMessage(gameSession, "추측 페이즈가 시작되었습니다. 이미지를 보고 키워드를 추측해주세요.");
+        messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
+        messageUtil.broadcastPhaseStartMessage(gameSession.getSessionId(), gameSession.getCurrentPhase(), "추측 페이즈가 시작되었습니다. 이미지를 보고 키워드를 추측해주세요.");
     }
 
     private void moveToNextPhase(GameSession gameSession) {
@@ -139,14 +135,13 @@ public class GameService {
         Map<String, Integer> scores = scoreCalculator.calculateScores(gameSession);
         gameSession.getPlayers().forEach(player ->
                 player.setScore(scores.get(player.getId())));
-        broadcastGameState(gameSession);
-        broadcastPhaseStartMessage(gameSession, "게임이 종료되었습니다. 결과를 확인해주세요.");
-        // 결과 데이터 전송
-        messagingTemplate.convertAndSend("/topic/game/" + gameSession.getSessionId() + "/result", scores);
+        messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
+        messageUtil.broadcastPhaseStartMessage(gameSession.getSessionId(), gameSession.getCurrentPhase(), "게임이 종료되었습니다. 결과를 확인해주세요.");
+        messageUtil.broadcastGameResult(gameSession.getSessionId(), scores);
         redisTemplate.delete(GAME_SESSION_KEY + gameSession.getSessionId());
     }
 
-    @Scheduled(fixedRate = 1000)
+    @Scheduled(fixedRate = 500)
     public void checkPhaseTimeouts() {
         List<String> sessionIds = redisTemplate.keys(GAME_SESSION_KEY + "*").stream()
                 .map(key -> key.replace(GAME_SESSION_KEY, ""))
@@ -157,7 +152,7 @@ public class GameService {
             if (gameSession.getState() == GameState.IN_PROGRESS && gameSession.isPhaseTimedOut()) {
                 moveToNextPhase(gameSession);
                 updateGameSession(gameSession);
-                broadcastGameState(gameSession);
+                messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
             }
         }
     }
@@ -179,18 +174,8 @@ public class GameService {
         redisUtil.set(GAME_SESSION_KEY + gameSession.getSessionId(), gameSession);
     }
 
-    private void broadcastGameState(GameSession gameSession) {
-        GameStateDto gameStateDto = createGameStateDto(gameSession);
-        messagingTemplate.convertAndSend("/topic/game/" + gameSession.getSessionId(), gameStateDto);
-    }
-
     public void broadcastChatMessage(String sessionId, ChatMessage message) {
-        messagingTemplate.convertAndSend("/topic/game/" + sessionId + "/chat", message);
-    }
-
-    private void sendToPlayer(String sessionId, String playerId, String type, Object data) {
-        PlayerMessage message = new PlayerMessage(type, data);
-        messagingTemplate.convertAndSendToUser(playerId, "/queue/game/" + sessionId, message);
+        messageUtil.broadcastChatMessage(sessionId, message);
     }
 
     private GameStateDto createGameStateDto(GameSession gameSession) {
@@ -250,7 +235,7 @@ public class GameService {
             String newToken = jwtUtil.refreshToken(player.getToken());
             player.setToken(newToken);
             updateGameSession(gameSession);
-            sendToPlayer(sessionId, playerId, "token", newToken);
+            messageUtil.sendToPlayer(sessionId, playerId, "token", newToken);
         }
     }
 
@@ -260,7 +245,7 @@ public class GameService {
         if (player != null && !gameSession.getPlayers().contains(player)) {
             gameSession.addPlayer(player);
             updateGameSession(gameSession);
-            broadcastGameState(gameSession);
+            messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
         }
     }
 
@@ -271,7 +256,7 @@ public class GameService {
             endGame(gameSession);
         } else {
             updateGameSession(gameSession);
-            broadcastGameState(gameSession);
+            messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
         }
     }
 
@@ -283,14 +268,6 @@ public class GameService {
     private void updateSubmissionProgress(GameSession gameSession, String type) {
         int submitted = type.equals("prompt") ? gameSession.getCurrentPrompts().size() : gameSession.getCurrentGuesses().size();
         int total = gameSession.getPlayers().size();
-        messagingTemplate.convertAndSend("/topic/game/" + gameSession.getSessionId() + "/progress",
-                Map.of("type", type, "submitted", submitted, "total", total));
+        messageUtil.updateSubmissionProgress(gameSession.getSessionId(), type, submitted, total);
     }
-
-    private void broadcastPhaseStartMessage(GameSession gameSession, String message) {
-        messagingTemplate.convertAndSend("/topic/game/" + gameSession.getSessionId() + "/phase",
-                Map.of("phase", gameSession.getCurrentPhase(), "message", message));
-    }
-
-
 }

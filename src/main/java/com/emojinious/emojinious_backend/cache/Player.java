@@ -20,6 +20,7 @@ public class Player implements Serializable {
     private Integer score;
     private String token;
     private String sessionId;
+    private String socketId;
 
     public Player(String id, String nickname, int characterId, boolean isHost) {
         this.id = id;

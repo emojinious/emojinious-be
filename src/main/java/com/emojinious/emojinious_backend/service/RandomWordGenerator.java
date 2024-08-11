@@ -1,5 +1,6 @@
 package com.emojinious.emojinious_backend.service;
 
+import com.emojinious.emojinious_backend.cache.Player;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
@@ -12,13 +13,13 @@ public class RandomWordGenerator {
             "커피", "피자", "치킨", "아이스크림", "초콜릿", "음악", "영화", "춤", "운동", "여행"
     );
 
-    public Map<String, String> generateKeywords(int count) {
+    public Map<String, String> generateKeywords(List<Player> players) {
         Map<String, String> result = new HashMap<>();
         List<String> shuffledWords = new ArrayList<>(words);
         Collections.shuffle(shuffledWords);
 
-        for (int i = 0; i < count; i++) {
-            result.put("player" + i, shuffledWords.get(i));
+        for (int i = 0; i < players.size(); i++) {
+            result.put(players.get(i).getId(), shuffledWords.get(i));
         }
 
         return result;
