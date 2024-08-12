@@ -6,5 +6,8 @@ public enum GamePhase {
     GENERATION,
     CHECKING,
     GUESSING,
+
+    TURN_RESULT,
+
     RESULT
 }

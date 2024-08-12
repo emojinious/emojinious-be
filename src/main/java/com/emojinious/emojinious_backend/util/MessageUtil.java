@@ -2,6 +2,7 @@ package com.emojinious.emojinious_backend.util;
 
 import com.emojinious.emojinious_backend.constant.GamePhase;
 import com.emojinious.emojinious_backend.dto.*;
+import com.emojinious.emojinious_backend.model.GameSession;
 import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.MessageHeaders;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
