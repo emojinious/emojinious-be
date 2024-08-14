@@ -13,18 +13,18 @@ import java.util.stream.Collectors;
 public class RandomWordGenerator {
     private final RestTemplate restTemplate;
     private static final String API_URL = "https://api.openai.com/v1/chat/completions";
-    private static final String API_KEY = "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";
+    private static final String API_KEY = "";
     public RandomWordGenerator(RestTemplate restTemplate) {
         this.restTemplate = restTemplate;
     }
 
-    public List<String> getKeywordsFromTheme(String theme, int numberOfKeywords) {
+    public Map<String, String> getKeywordsFromTheme(List<Player> players, String theme, int numberOfKeywords) {
         // API 요청 데이터 생성
         KeywordRequest request = new KeywordRequest(theme, numberOfKeywords);
         // API 호출
         String response = callOpenAI(request);
         // 응답 처리
-        return parseResponse(response);
+        return parseResponse(players, response);
     }
 
     private String callOpenAI(KeywordRequest request) {
@@ -51,12 +51,20 @@ public class RandomWordGenerator {
         }
     }
 
-    private List<String> parseResponse(String response) {
+    private Map<String, String> parseResponse(List<Player> players, String response) {
+        List<String> words = new ArrayList<>();
+        Map<String, String> result = new HashMap<>();
+
         if (response != null && !response.isEmpty()) {
-            return Arrays.stream(response.split(","))
+            words = Arrays.stream(response.split(","))
                     .map(String::trim)
                     .collect(Collectors.toList());
         }
-        return List.of();
+
+        for (int i = 0; i < players.size(); i++) {
+            result.put(players.get(i).getId(), words.get(i));
+        }
+
+        return result;
     }
 }

@@ -50,17 +50,17 @@ public class GameService {
         return createGameStateDto(gameSession);
     }
 
-    public void generateKeywords(GameSession gameSession) {
-        List<String> keywords = randomWordGenerator.getKeywordsFromTheme(gameSession.getSettings().getTheme(), gameSession.getPlayers().size());
-        gameSession.getCurrentKeywords().clear();
-        for (int i = 0; i < gameSession.getPlayers().size(); i++) {
-            Player player = gameSession.getPlayers().get(i);
-            if (i < keywords.size()) {
-                gameSession.getCurrentKeywords().put(player.getId(), keywords.get(i));
-            }
-        }
-        updateGameSession(gameSession);
-    }
+//    public void generateKeywords(GameSession gameSession) {
+//        List<String> keywords = randomWordGenerator.getKeywordsFromTheme(gameSession.getSettings().getTheme(), gameSession.getPlayers().size());
+//        gameSession.getCurrentKeywords().clear();
+//        for (int i = 0; i < gameSession.getPlayers().size(); i++) {
+//            Player player = gameSession.getPlayers().get(i);
+//            if (i < keywords.size()) {
+//                gameSession.getCurrentKeywords().put(player.getId(), keywords.get(i));
+//            }
+//        }
+//        updateGameSession(gameSession);
+//    }
 
     public GameStateDto submitPrompt(String sessionId, String playerId, String prompt) {
         GameSession gameSession = getGameSession(sessionId);
@@ -89,12 +89,7 @@ public class GameService {
     private void startDescriptionPhase(GameSession gameSession) {
         gameSession.setCurrentPhase(GamePhase.DESCRIPTION);
         messageUtil.broadcastPhaseStartMessage(gameSession.getSessionId(), gameSession.getCurrentPhase(), "Keyword Generation");
-        List<String> keywords = ranomWordGenerator.getKeywordsFromTheme(gameSession.getSettings().getTheme(), gameSession.getPlayers().size());
-        Map<String, String> result = new HashMap<>();
-        for (int i = 0; i < gameSession.getPlayers().size(); i++) {
-            result.put(gameSession.getPlayers().get(i).getId(), keywords.get(i));
-        }
-        gameSession.setCurrentKeywords(result);
+        Map<String, String> keywords = randomWordGenerator.getKeywordsFromTheme(gameSession.getPlayers(), gameSession.getSettings().getTheme(), gameSession.getPlayers().size());
         gameSession.getPlayers().forEach(player ->
                 messageUtil.sendToPlayer(gameSession.getSessionId(), player.getSocketId(), "keyword", keywords.get(player.getId())));
         messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));

@@ -75,13 +75,13 @@ public class WebSocketController {
         return gameService.startGame(sessionId, playerId);
     }
 
-    @MessageMapping("/game/{sessionId}/getKeywords")
-    @SendTo("/topic/game/{sessionId}")
-    public GameSession requestKeywords(@DestinationVariable String sessionId) {
-        GameSession gameSession = gameService.getGameSession(sessionId);
-        gameService.generateKeywords(gameSession);
-        return gameSession;
-    }
+//    @MessageMapping("/game/{sessionId}/getKeywords")
+//    @SendTo("/topic/game/{sessionId}")
+//    public GameSession requestKeywords(@DestinationVariable String sessionId) {
+//        GameSession gameSession = gameService.getGameSession(sessionId);
+//        gameService.generateKeywords(gameSession);
+//        return gameSession;
+//    }
 
     @MessageMapping("/game/{sessionId}/prompt")
     @SendTo("/topic/game/{sessionId}")
