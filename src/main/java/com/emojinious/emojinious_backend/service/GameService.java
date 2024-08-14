@@ -62,17 +62,20 @@ public class GameService {
 //        updateGameSession(gameSession);
 //    }
 
-    public GameStateDto submitPrompt(String sessionId, String playerId, String prompt) {
+    public GameStateDto submitPrompt(String sessionId, String playerId, String message) {
         GameSession gameSession = getGameSession(sessionId);
-        gameSession.submitPrompt(playerId, prompt);
-        updateSubmissionProgress(gameSession, "prompt");
+        gameSession.submitPrompt(playerId, message);
+        String image = imageGenerator.getImagesFromMessage(message);
+        gameSession.saveImage(playerId, image);
+
         if (gameSession.getCurrentPrompts().size() == gameSession.getPlayers().size()) {
-            startGenerationPhase(gameSession);
+            gameSession.moveToNextPhase();
         }
         updateGameSession(gameSession);
         messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
         return createGameStateDto(gameSession);
     }
+
 
     public GameStateDto submitGuess(String sessionId, String playerId, String guess) {
         GameSession gameSession = getGameSession(sessionId);
@@ -104,7 +107,7 @@ public class GameService {
 
         // TODO: 동시 요청, 이미지 생성 후 바로 다음 페이즈로 넘어가도록 수정
         gameSession.getCurrentPrompts().forEach((playerId, prompt) -> {
-            String imageUrl = imageGenerator.generateImage(prompt);
+            String imageUrl = imageGenerator.getImagesFromMessage(prompt);
             gameSession.setGeneratedImage(playerId, imageUrl);
         });
 

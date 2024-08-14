@@ -131,13 +131,17 @@ public class GameSession implements Serializable {
     }
 
     public void submitPrompt(String playerId, String prompt) {
-        if (currentPhase != GamePhase.DESCRIPTION) {
-            throw new IllegalStateException("Not in description phase");
+        if (state != GameState.IN_PROGRESS) {
+            throw new IllegalStateException("Game is not in progress");
         }
         currentPrompts.put(playerId, prompt);
-        if (currentPrompts.size() == players.size()) {
-            moveToNextPhase();
+    }
+
+    public void saveImage(String playerId, String image) {
+        if (state != GameState.IN_PROGRESS) {
+            throw new IllegalStateException("Game is not in progress");
         }
+        generatedImages.put(playerId, image);
     }
 
     public void submitGuess(String playerId, String guess) {

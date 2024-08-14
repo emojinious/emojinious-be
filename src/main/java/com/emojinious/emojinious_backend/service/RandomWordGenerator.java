@@ -2,6 +2,10 @@ package com.emojinious.emojinious_backend.service;
 
 import com.emojinious.emojinious_backend.cache.Player;
 import com.emojinious.emojinious_backend.dto.KeywordRequest;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
@@ -12,6 +16,7 @@ import java.util.stream.Collectors;
 @Component
 public class RandomWordGenerator {
     private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper = new ObjectMapper();
     private static final String API_URL = "https://api.openai.com/v1/chat/completions";
     private static final String API_KEY = "";
     public RandomWordGenerator(RestTemplate restTemplate) {
@@ -32,14 +37,17 @@ public class RandomWordGenerator {
         headers.set("Authorization", "Bearer " + API_KEY);
         headers.set("Content-Type", "application/json");
 
+        long time = System.currentTimeMillis();
+        Random random = new Random(time);
+        int seed = random.nextInt(1_000_000);
         String prompt = "Generate " +
                 request.getNumberOfKeywords() + " Korean keywords for the theme [ " +
                 request.getTheme() + " ], where each keyword is a set of up to " +
                 1 + " words. Response format: Answer the keywords without any other phrases, separated by commas.";
         // OpenAI API 요청 본문 생성
         String requestBody = String.format(
-                "{\"model\": \"gpt-4\", \"messages\": [{\"role\": \"user\", \"content\": \"%s\"}], \"max_tokens\": 100}",
-                prompt
+                "{\"model\": \"gpt-4\", \"messages\": [{\"role\": \"user\", \"content\": \"%s\"}], \"max_tokens\": 1000, \"temperature\": 0.9, \"top_p\": 0.9, \"seed\": %d}",
+                prompt, seed
         );
 
         HttpEntity<String> httpEntity = new HttpEntity<>(requestBody, headers);
@@ -51,20 +59,39 @@ public class RandomWordGenerator {
         }
     }
 
-    private Map<String, String> parseResponse(List<Player> players, String response) {
+
+    public Map<String, String> parseResponse(List<Player> players, String jsonResponse) {
+        String content;
+        try {
+            JsonNode rootNode = objectMapper.readTree(jsonResponse);
+            content = rootNode.path("choices")
+                    .path(0)
+                    .path("message")
+                    .path("content")
+                    .asText();
+        } catch (JsonProcessingException e) {
+            return Collections.emptyMap();
+        }
+
         List<String> words = new ArrayList<>();
         Map<String, String> result = new HashMap<>();
 
-        if (response != null && !response.isEmpty()) {
-            words = Arrays.stream(response.split(","))
+        System.out.println("content = " + content);
+        if (content != null && !content.isEmpty()) {
+            words = Arrays.stream(content.split(","))
                     .map(String::trim)
                     .collect(Collectors.toList());
         }
 
         for (int i = 0; i < players.size(); i++) {
-            result.put(players.get(i).getId(), words.get(i));
+            if (i < words.size()) {
+                result.put(players.get(i).getId(), words.get(i));
+            } else {
+                result.put(players.get(i).getId(), "");
+            }
         }
 
         return result;
     }
+
 }
