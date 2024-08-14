@@ -86,13 +86,15 @@ public class GameService {
                 messageUtil.sendToPlayer(gameSession.getSessionId(), player.getSocketId(), "keyword", keywords.get(player.getId())));
         messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
         messageUtil.broadcastPhaseStartMessage(gameSession.getSessionId(), gameSession.getCurrentPhase(), "Description Phase");
+        updateSubmissionProgress(gameSession, "prompt");
     }
 
     private void startGenerationPhase(GameSession gameSession) {
         gameSession.setCurrentPhase(GamePhase.GENERATION);
+        messageUtil.broadcastPhaseStartMessage(gameSession.getSessionId(), gameSession.getCurrentPhase(), "Image Generation");
         messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
-        messageUtil.broadcastPhaseStartMessage(gameSession.getSessionId(), gameSession.getCurrentPhase(), "Generation Phase");
 
+        // TODO: 동시 요청, 이미지 생성 후 바로 다음 페이즈로 넘어가도록 수정
         gameSession.getCurrentPrompts().forEach((playerId, prompt) -> {
             String imageUrl = imageGenerator.generateImage(prompt);
             gameSession.setGeneratedImage(playerId, imageUrl);
