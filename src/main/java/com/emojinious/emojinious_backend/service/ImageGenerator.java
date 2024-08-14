@@ -17,6 +17,6 @@ public class ImageGenerator {
 
         // imgur api나 올려서 링크만 전달
 
-        return "예시예시.com/" + System.currentTimeMillis();
+        return "예시예시.com/" + System.nanoTime();
     }
 }

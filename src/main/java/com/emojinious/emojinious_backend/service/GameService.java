@@ -15,6 +15,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.stream.Collectors;
 
 @Service
@@ -99,18 +101,41 @@ public class GameService {
         });
 
         if (gameSession.areAllImagesGenerated()) {
-            startGuessingPhase(gameSession);
+            startCheckingPhase(gameSession);
         }
     }
 
+    private void startCheckingPhase(GameSession gameSession){
+        gameSession.setCurrentPhase(GamePhase.CHECKING);
+        messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
+        messageUtil.broadcastPhaseStartMessage(gameSession.getSessionId(), gameSession.getCurrentPhase(), "Checking Phase");
+
+        Map<String, String> images = gameSession.getGeneratedImages();
+        gameSession.getPlayers().forEach(player ->
+                messageUtil.sendToPlayer(gameSession.getSessionId(), player.getSocketId(), "image", images.get(player.getId())));
+        messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
+    }
+
+
     private void startGuessingPhase(GameSession gameSession) {
         gameSession.setCurrentPhase(GamePhase.GUESSING);
+        messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
+        messageUtil.broadcastPhaseStartMessage(gameSession.getSessionId(), gameSession.getCurrentPhase(), "Guessing Phase");
         gameSession.getPlayers().forEach(player -> {
             String imageUrl = getNextImageForPlayer(gameSession, player.getId());
             messageUtil.sendToPlayer(gameSession.getSessionId(), player.getSocketId(), "image", imageUrl);
         });
         messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
-        messageUtil.broadcastPhaseStartMessage(gameSession.getSessionId(), gameSession.getCurrentPhase(), "추측 페이즈가 시작되었습니다. 이미지를 보고 키워드를 추측해주세요.");
+    }
+
+    private void startTurnResultPhase(GameSession gameSession) {
+        gameSession.setCurrentPhase(GamePhase.TURN_RESULT);
+        messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
+        messageUtil.broadcastPhaseStartMessage(gameSession.getSessionId(), gameSession.getCurrentPhase(), "Turn Result Phase");
+
+        //플레이어의 키워드, 이미지, 프롬프트 공개
+
+        messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
     }
 
     private void moveToNextPhase(GameSession gameSession) {
@@ -122,8 +147,14 @@ public class GameService {
             case GENERATION:
                 startGenerationPhase(gameSession);
                 break;
+            case CHECKING:
+                startCheckingPhase(gameSession);
+                break;
             case GUESSING:
                 startGuessingPhase(gameSession);
+                break;
+            case TURN_RESULT:
+                startTurnResultPhase(gameSession);
                 break;
             case RESULT:
                 endGame(gameSession);
@@ -227,6 +258,9 @@ public class GameService {
         int currentIndex = playerIds.indexOf(playerId);
         int nextIndex = (currentIndex + 1) % playerIds.size();
         String nextPlayerId = playerIds.get(nextIndex);
+
+        playerIds.set(currentIndex, nextPlayerId);
+
         return gameSession.getGeneratedImages().get(nextPlayerId);
     }
 

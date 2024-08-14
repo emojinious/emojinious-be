@@ -70,9 +70,15 @@ public class GameSession implements Serializable {
                 currentPhase = GamePhase.GENERATION;
                 break;
             case GENERATION:
+                currentPhase = GamePhase.CHECKING;
+                break;
+            case CHECKING:
                 currentPhase = GamePhase.GUESSING;
                 break;
             case GUESSING:
+                currentPhase = GamePhase.TURN_RESULT;
+                break;
+            case TURN_RESULT:
                 if (currentTurn < settings.getTurns()) {
                     currentTurn++;
                     currentPhase = GamePhase.DESCRIPTION;
