@@ -13,10 +13,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.scheduling.annotation.Scheduled;
 
-import java.util.List;
-import java.util.Map;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -53,6 +50,18 @@ public class GameService {
         return createGameStateDto(gameSession);
     }
 
+    public void generateKeywords(GameSession gameSession) {
+        List<String> keywords = randomWordGenerator.getKeywordsFromTheme(gameSession.getSettings().getTheme(), gameSession.getPlayers().size());
+        gameSession.getCurrentKeywords().clear();
+        for (int i = 0; i < gameSession.getPlayers().size(); i++) {
+            Player player = gameSession.getPlayers().get(i);
+            if (i < keywords.size()) {
+                gameSession.getCurrentKeywords().put(player.getId(), keywords.get(i));
+            }
+        }
+        updateGameSession(gameSession);
+    }
+
     public GameStateDto submitPrompt(String sessionId, String playerId, String prompt) {
         GameSession gameSession = getGameSession(sessionId);
         gameSession.submitPrompt(playerId, prompt);
@@ -79,9 +88,13 @@ public class GameService {
 
     private void startDescriptionPhase(GameSession gameSession) {
         gameSession.setCurrentPhase(GamePhase.DESCRIPTION);
-        messageUtil.broadcastPhaseStartMessage(gameSession.getSessionId(), gameSession.getCurrentPhase(), "KeyWord Generation");
-        Map<String, String> keywords = randomWordGenerator.generateKeywords(gameSession.getPlayers());
-        gameSession.setCurrentKeywords(keywords);
+        messageUtil.broadcastPhaseStartMessage(gameSession.getSessionId(), gameSession.getCurrentPhase(), "Keyword Generation");
+        List<String> keywords = ranomWordGenerator.getKeywordsFromTheme(gameSession.getSettings().getTheme(), gameSession.getPlayers().size());
+        Map<String, String> result = new HashMap<>();
+        for (int i = 0; i < gameSession.getPlayers().size(); i++) {
+            result.put(gameSession.getPlayers().get(i).getId(), keywords.get(i));
+        }
+        gameSession.setCurrentKeywords(result);
         gameSession.getPlayers().forEach(player ->
                 messageUtil.sendToPlayer(gameSession.getSessionId(), player.getSocketId(), "keyword", keywords.get(player.getId())));
         messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
@@ -195,7 +208,7 @@ public class GameService {
         return gameSession != null ? gameSession : new GameSession(sessionId);
     }
 
-    private GameSession getGameSession(String sessionId) {
+    public GameSession getGameSession(String sessionId) {
         GameSession gameSession = redisUtil.get(GAME_SESSION_KEY + sessionId, GameSession.class);
         if (gameSession == null) {
             throw new IllegalStateException("Game session not found");

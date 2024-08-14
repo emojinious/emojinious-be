@@ -9,6 +9,8 @@ public class GameSettings implements Serializable {
     private int guessTimeLimit;
     private String difficulty;
     private int turns;
+    private String theme;
+
 
     public GameSettings() {
         // Default settings
@@ -16,5 +18,6 @@ public class GameSettings implements Serializable {
         this.guessTimeLimit = 15;
         this.difficulty = "NORMAL";
         this.turns = 3;
+        this.theme = "movie";
     }
 }

@@ -35,6 +35,7 @@ public class GameSessionService {
             gameSettings.setGuessTimeLimit(settings.getGuessTimeLimit());
             gameSettings.setDifficulty(settings.getDifficulty());
             gameSettings.setTurns(settings.getTurns());
+            gameSettings.setTheme(settings.getTheme());
             redisUtil.set("game:session:" + sessionId, gameSession);
         }
     }
