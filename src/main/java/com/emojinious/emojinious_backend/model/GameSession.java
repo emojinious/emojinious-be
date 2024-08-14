@@ -1,26 +1,31 @@
 package com.emojinious.emojinious_backend.model;
 
 import com.emojinious.emojinious_backend.cache.Player;
+import com.emojinious.emojinious_backend.constant.GamePhase;
 import com.emojinious.emojinious_backend.constant.GameState;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Data;
 import java.io.Serializable;
 import java.util.*;
 
 @Data
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class GameSession implements Serializable {
     private String sessionId;
     private List<Player> players;
     private GameSettings settings;
     private GameState state;
     private int currentTurn;
+    private GamePhase currentPhase;
     private Map<String, String> currentPrompts;
     private Map<String, String> currentGuesses;
     private Map<String, String> currentKeywords;
-    private long turnStartTime;
-    private long turnEndTime;
+    private Map<String, String> generatedImages;
+    private long phaseStartTime;
+    private long phaseEndTime;
 
     public GameSession() {
-        // 역직렬화 문제 방지
+        // 역직렬화 문제 방지, 이제필요없음(아마도)
     }
 
     public GameSession(String sessionId) {
@@ -29,9 +34,11 @@ public class GameSession implements Serializable {
         this.settings = new GameSettings();
         this.state = GameState.WAITING;
         this.currentTurn = 0;
+        this.currentPhase = GamePhase.WAITING;
         this.currentPrompts = new HashMap<>();
         this.currentGuesses = new HashMap<>();
         this.currentKeywords = new HashMap<>();
+        this.generatedImages = new HashMap<>();
     }
 
     public void addPlayer(Player player) {
@@ -51,56 +58,65 @@ public class GameSession implements Serializable {
         }
         state = GameState.IN_PROGRESS;
         currentTurn = 1;
-        generateKeywords();
-        startTurnTimer();
+        moveToNextPhase();
     }
 
-    public void submitPrompt(String playerId, String prompt) {
-        if (state != GameState.IN_PROGRESS) {
-            throw new IllegalStateException("Game is not in progress");
+    public void moveToNextPhase() {
+        switch (currentPhase) {
+            case WAITING:
+                currentPhase = GamePhase.DESCRIPTION;
+                break;
+            case DESCRIPTION:
+                currentPhase = GamePhase.GENERATION;
+                break;
+            case GENERATION:
+                currentPhase = GamePhase.CHECKING;
+                break;
+            case CHECKING:
+                currentPhase = GamePhase.GUESSING;
+                break;
+            case GUESSING:
+                currentPhase = GamePhase.TURN_RESULT;
+                break;
+            case TURN_RESULT:
+                if (currentTurn < settings.getTurns()) {
+                    currentTurn++;
+                    currentPhase = GamePhase.DESCRIPTION;
+                } else {
+                    currentPhase = GamePhase.RESULT;
+                    state = GameState.FINISHED;
+                }
+                break;
+            case RESULT:
+                // Game is finished
+                break;
         }
-        currentPrompts.put(playerId, prompt);
-        if (currentPrompts.size() == players.size()) {
-            moveToGuessingPhase();
+        startPhaseTimer();
+    }
+
+    public void startPhaseTimer() {
+        phaseStartTime = System.currentTimeMillis();
+        switch (currentPhase) {
+            case DESCRIPTION:
+                phaseEndTime = phaseStartTime + (settings.getPromptTimeLimit() * 1000L);
+                break;
+            case GUESSING:
+                phaseEndTime = phaseStartTime + (settings.getGuessTimeLimit() * 1000L);
+                break;
+            case GENERATION:
+                phaseEndTime = phaseStartTime + 10000; // 10초
+                break;
+            default:
+                phaseEndTime = phaseStartTime + 10000; // 10초
         }
     }
 
-    public void submitGuess(String playerId, String guess) {
-        if (state != GameState.IN_PROGRESS) {
-            throw new IllegalStateException("Game is not in progress");
-        }
-        currentGuesses.put(playerId, guess);
-        if (currentGuesses.size() == players.size()) {
-            moveToNextTurn();
-        }
+    public boolean isPhaseTimedOut() {
+        return System.currentTimeMillis() > phaseEndTime;
     }
 
-    private void generateKeywords() {
-        // Logic to generate and assign keywords to players
-        // ha...tlqkf
-    }
-
-    private void startTurnTimer() {
-        turnStartTime = System.currentTimeMillis();
-        turnEndTime = turnStartTime + (settings.getPromptTimeLimit() * 1000);
-    }
-
-    public void moveToGuessingPhase() {
-        this.turnStartTime = System.currentTimeMillis();
-        this.turnEndTime = turnStartTime + (settings.getGuessTimeLimit() * 1000);
-        // 추가 ...
-    }
-
-    public void moveToNextTurn() {
-        this.currentTurn++;
-        if (this.currentTurn > this.settings.getTurns()) {
-            this.state = GameState.FINISHED;
-        } else {
-            this.currentPrompts.clear();
-            this.currentGuesses.clear();
-            this.turnStartTime = System.currentTimeMillis();
-            this.turnEndTime = turnStartTime + (settings.getPromptTimeLimit() * 1000);
-        }
+    public long getRemainingTime() {
+        return Math.max(0, phaseEndTime - System.currentTimeMillis());
     }
 
     public Player getPlayerById(String playerId) {
@@ -111,5 +127,40 @@ public class GameSession implements Serializable {
     }
 
     public void removePlayer(String playerId) {
+        players.removeIf(player -> player.getId().equals(playerId));
+    }
+
+    public void submitPrompt(String playerId, String prompt) {
+        if (currentPhase != GamePhase.DESCRIPTION) {
+            throw new IllegalStateException("Not in description phase");
+        }
+        currentPrompts.put(playerId, prompt);
+        if (currentPrompts.size() == players.size()) {
+            moveToNextPhase();
+        }
+    }
+
+    public void submitGuess(String playerId, String guess) {
+        if (currentPhase != GamePhase.GUESSING) {
+            throw new IllegalStateException("Not in guessing phase");
+        }
+        currentGuesses.put(playerId, guess);
+        if (currentGuesses.size() == players.size()) {
+            moveToNextPhase();
+        }
+    }
+
+    public void setGeneratedImage(String playerId, String imageUrl) {
+        generatedImages.put(playerId, imageUrl);
+    }
+
+    public boolean areAllImagesGenerated() {
+        return generatedImages.size() == players.size();
+    }
+
+    public void clearCurrentRoundData() {
+        currentPrompts.clear();
+        currentGuesses.clear();
+        generatedImages.clear();
     }
 }

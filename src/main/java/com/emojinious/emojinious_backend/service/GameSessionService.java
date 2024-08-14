@@ -4,34 +4,21 @@ import com.emojinious.emojinious_backend.dto.GameSettingsDto;
 import com.emojinious.emojinious_backend.cache.Player;
 import com.emojinious.emojinious_backend.model.GameSession;
 import com.emojinious.emojinious_backend.model.GameSettings;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.util.Map;
+import com.emojinious.emojinious_backend.util.RedisUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
-
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class GameSessionService {
-    private final RedisTemplate<String, Object> redisTemplate;
-    private final ObjectMapper objectMapper;
+    private final RedisUtil redisUtil;
 
     public void updateGameSettings(String sessionId, String playerId, GameSettingsDto settings) {
-        Object playerData = redisTemplate.opsForValue().get("player:" + playerId);
-        if (playerData == null) {
+        Player player = redisUtil.get("player:" + playerId, Player.class);
+        if (player == null) {
             throw new IllegalArgumentException("Player not found");
-        }
-
-        Player player;
-        if (playerData instanceof Player) {
-            player = (Player) playerData;
-        } else if (playerData instanceof Map) {
-            player = objectMapper.convertValue(playerData, Player.class);
-        } else {
-            throw new IllegalArgumentException("Invalid player data format");
         }
 
         if (!player.getSessionId().equals(sessionId) || !player.isHost()) {
@@ -39,21 +26,16 @@ public class GameSessionService {
         }
 
         String gameSettingsKey = "game:settings:" + sessionId;
-        redisTemplate.opsForHash().putAll(gameSettingsKey, Map.of(
-                "promptTimeLimit", settings.getPromptTimeLimit(),
-                "guessTimeLimit", settings.getGuessTimeLimit(),
-                "difficulty", settings.getDifficulty(),
-                "turns", settings.getTurns()
-        ));
+        redisUtil.set(gameSettingsKey, settings);
 
-        GameSession gameSession = (GameSession) redisTemplate.opsForValue().get("game:session:" + sessionId);
+        GameSession gameSession = redisUtil.get("game:session:" + sessionId, GameSession.class);
         if (gameSession != null) {
             GameSettings gameSettings = gameSession.getSettings();
             gameSettings.setPromptTimeLimit(settings.getPromptTimeLimit());
             gameSettings.setGuessTimeLimit(settings.getGuessTimeLimit());
             gameSettings.setDifficulty(settings.getDifficulty());
             gameSettings.setTurns(settings.getTurns());
-            redisTemplate.opsForValue().set("game:session:" + sessionId, gameSession);
+            redisUtil.set("game:session:" + sessionId, gameSession);
         }
     }
 }

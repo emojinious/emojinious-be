@@ -2,10 +2,9 @@ package com.emojinious.emojinious_backend.service;
 
 import com.emojinious.emojinious_backend.cache.Player;
 import com.emojinious.emojinious_backend.util.JwtUtil;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.emojinious.emojinious_backend.util.RedisUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
@@ -15,9 +14,8 @@ import java.util.concurrent.TimeUnit;
 @Service
 @RequiredArgsConstructor
 public class PlayerService {
-    private final RedisTemplate<String, Object> redisTemplate;
+    private final RedisUtil redisUtil;
     private final JwtUtil jwtUtil;
-    private final ObjectMapper objectMapper;
 
     private static final String PLAYER_KEY = "player:";
     private static final String SESSION_PLAYER_KEY = "session:player:";
@@ -37,38 +35,24 @@ public class PlayerService {
         String playerKey = PLAYER_KEY + player.getId();
         String sessionPlayerKey = SESSION_PLAYER_KEY + player.getSessionId();
 
-        redisTemplate.opsForValue().set(playerKey, player, PLAYER_EXPIRATION, TimeUnit.SECONDS);
-        redisTemplate.opsForValue().set(sessionPlayerKey, player.getId(), PLAYER_EXPIRATION, TimeUnit.SECONDS);
+        redisUtil.setWithExpiration(playerKey, player, PLAYER_EXPIRATION, TimeUnit.SECONDS);
+        redisUtil.setWithExpiration(sessionPlayerKey, player.getId(), PLAYER_EXPIRATION, TimeUnit.SECONDS);
     }
 
     public Player getPlayerById(String playerId) {
-        Object playerData = redisTemplate.opsForValue().get(PLAYER_KEY + playerId);
-        if (playerData == null) {
-            return null;
-        }
-        try {
-            if (playerData instanceof Player) {
-                return (Player) playerData;
-            }
-            return objectMapper.convertValue(playerData, Player.class);
-        } catch (Exception e) {
-            log.error("Error deserializing player data for id: " + playerId, e);
-            return null;
-        }
+        return redisUtil.get(PLAYER_KEY + playerId, Player.class);
     }
+
     public Player getPlayerBySessionId(String sessionId) {
-        String playerId = (String) redisTemplate.opsForValue().get(SESSION_PLAYER_KEY + sessionId);
-        if (playerId != null) {
-            return getPlayerById(playerId);
-        }
-        return null;
+        String playerId = redisUtil.get(SESSION_PLAYER_KEY + sessionId, String.class);
+        return playerId != null ? getPlayerById(playerId) : null;
     }
 
     public void removePlayer(String playerId) {
         Player player = getPlayerById(playerId);
         if (player != null) {
-            redisTemplate.delete(PLAYER_KEY + playerId);
-            redisTemplate.delete(SESSION_PLAYER_KEY + player.getSessionId());
+            redisUtil.delete(PLAYER_KEY + playerId);
+            redisUtil.delete(SESSION_PLAYER_KEY + player.getSessionId());
         }
     }
 
@@ -81,7 +65,7 @@ public class PlayerService {
     }
 
     public boolean existsBySessionId(String sessionId) {
-        return redisTemplate.hasKey(SESSION_PLAYER_KEY + sessionId);
+        return redisUtil.hasKey(SESSION_PLAYER_KEY + sessionId);
     }
 
     public String refreshToken(String playerId) {
@@ -96,6 +80,6 @@ public class PlayerService {
     }
 
     public String generateInviteLink(String sessionId) {
-        return "localhost:8080/?sessionId=" + sessionId;
+        return "http://localhost:3000/join?sessionId=" + sessionId;
     }
 }
