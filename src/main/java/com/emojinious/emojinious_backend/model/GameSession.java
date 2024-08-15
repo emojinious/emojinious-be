@@ -104,10 +104,10 @@ public class GameSession implements Serializable {
                 phaseEndTime = phaseStartTime + (settings.getGuessTimeLimit() * 1000L);
                 break;
             case GENERATION:
-                phaseEndTime = phaseStartTime + 10000; // 10초
+                phaseEndTime = phaseStartTime + 100000; // 100초
                 break;
             default:
-                phaseEndTime = phaseStartTime + 10000; // 10초
+                phaseEndTime = phaseStartTime + 100000; // 100초
         }
     }
 

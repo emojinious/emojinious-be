@@ -3,6 +3,7 @@ package com.emojinious.emojinious_backend.service;
 import com.emojinious.emojinious_backend.dto.PromptSubmissionMessage;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
@@ -12,7 +13,9 @@ public class ImageGenerator {
 
     private final RestTemplate restTemplate;
     private static final String API_URL = "https://api.openai.com/v1/images/generations";
-    private static final String API_KEY = "";
+
+    @Value("${openai.api-key}")
+    private String API_KEY;
 
     public ImageGenerator(RestTemplate restTemplate) {
         this.restTemplate = restTemplate;
@@ -33,9 +36,10 @@ public class ImageGenerator {
         headers.set("Content-Type", "application/json");
 
         String requestBody = String.format(
-                "{\"prompt\": \"%s\", \"n\": 1, \"size\": \"1024x1024\"}",
-                prompt
+                "{\"model\": \"dall-e-3\",\"prompt\": \"%s\", \"n\": 1, \"size\": \"1024x1024\"}",
+                "Create an cute ink sketch emoji style illustration of the following: " + prompt
         );
+
 
         HttpEntity<String> request = new HttpEntity<>(requestBody, headers);
         ResponseEntity<String> responseEntity = restTemplate.exchange(API_URL, HttpMethod.POST, request, String.class);
@@ -54,6 +58,7 @@ public class ImageGenerator {
             JsonNode imageUrlNode = root.findPath("url");
 
             if (imageUrlNode != null && !imageUrlNode.isMissingNode()) {
+                System.out.println("imageUrlNode.asText() = " + imageUrlNode.asText());
                 return imageUrlNode.asText();
             } else {
                 throw new RuntimeException("Image URL not found in response.");

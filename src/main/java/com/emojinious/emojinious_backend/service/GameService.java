@@ -40,6 +40,7 @@ public class GameService {
     }
 
     public GameStateDto startGame(String sessionId, String playerId) {
+        System.out.println("GameService.startGame");
         GameSession gameSession = getGameSession(sessionId);
         if (!gameSession.isHost(playerId)) {
             throw new IllegalStateException("Only host can start the game");
@@ -63,16 +64,18 @@ public class GameService {
 //    }
 
     public GameStateDto submitPrompt(String sessionId, String playerId, String message) {
+        System.out.println("GameService.submitPrompt");
         GameSession gameSession = getGameSession(sessionId);
         gameSession.submitPrompt(playerId, message);
-        String image = imageGenerator.getImagesFromMessage(message);
-        gameSession.saveImage(playerId, image);
-
-        if (gameSession.getCurrentPrompts().size() == gameSession.getPlayers().size()) {
-            gameSession.moveToNextPhase();
-        }
+        // String image = imageGenerator.getImagesFromMessage(message);
+        // gameSession.saveImage(playerId, image);
+        updateSubmissionProgress(gameSession, "prompt");
+//        if (gameSession.getCurrentPrompts().size() == gameSession.getPlayers().size()) {
+//            gameSession.moveToNextPhase();
+//        }
         updateGameSession(gameSession);
         messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
+        System.out.println("gameSession = " + gameSession);
         return createGameStateDto(gameSession);
     }
 
@@ -90,6 +93,7 @@ public class GameService {
     }
 
     private void startDescriptionPhase(GameSession gameSession) {
+        System.out.println("GameService.startDescriptionPhase");
         gameSession.setCurrentPhase(GamePhase.DESCRIPTION);
         messageUtil.broadcastPhaseStartMessage(gameSession.getSessionId(), gameSession.getCurrentPhase(), "Keyword Generation");
         Map<String, String> keywords = randomWordGenerator.getKeywordsFromTheme(gameSession.getPlayers(), gameSession.getSettings().getTheme(), gameSession.getPlayers().size());
@@ -101,12 +105,14 @@ public class GameService {
     }
 
     private void startGenerationPhase(GameSession gameSession) {
+        System.out.println("GameService.startGenerationPhase");
         gameSession.setCurrentPhase(GamePhase.GENERATION);
         messageUtil.broadcastPhaseStartMessage(gameSession.getSessionId(), gameSession.getCurrentPhase(), "Image Generation");
         messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
 
         // TODO: 동시 요청, 이미지 생성 후 바로 다음 페이즈로 넘어가도록 수정
         gameSession.getCurrentPrompts().forEach((playerId, prompt) -> {
+            System.out.println("prompt = " + prompt);
             String imageUrl = imageGenerator.getImagesFromMessage(prompt);
             gameSession.setGeneratedImage(playerId, imageUrl);
         });
@@ -114,9 +120,11 @@ public class GameService {
         if (gameSession.areAllImagesGenerated()) {
             startCheckingPhase(gameSession);
         }
+        System.out.println("gameSession = " + gameSession);
     }
 
     private void startCheckingPhase(GameSession gameSession){
+        System.out.println("GameService.startCheckingPhase");
         gameSession.setCurrentPhase(GamePhase.CHECKING);
         messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
         messageUtil.broadcastPhaseStartMessage(gameSession.getSessionId(), gameSession.getCurrentPhase(), "Checking Phase");
@@ -129,6 +137,7 @@ public class GameService {
 
 
     private void startGuessingPhase(GameSession gameSession) {
+        System.out.println("GameService.startGuessingPhase");
         gameSession.setCurrentPhase(GamePhase.GUESSING);
         messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
         messageUtil.broadcastPhaseStartMessage(gameSession.getSessionId(), gameSession.getCurrentPhase(), "Guessing Phase");

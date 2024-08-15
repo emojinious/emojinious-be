@@ -19,6 +19,9 @@ spring:
       add-mappings: true
       static-locations: classpath:/static
 
+openai:
+  api-key: ENC(jlLqq1U41iUVBwvkghG09L1nczBaRSM1xP9yS0LumwK/pZA7mMFXwHSp0SxWZ9cv1XvgS6VGNy99qaeD4+WEzPU5Yd+jtLvGjhix/2OfXHy5hJWlVTV5204KQDIdmPQ5MjUjMv+2/G+ZeovvBl3FMzWB8uIFOoi6FvFYtNAKh8wNikefyi40A0qCPh9pDZal)
+
 jwt:
   secret: ENC(U1iEDPMT18taS96ZUvkQO8XEoJdjftoiSiFgPYEwfUlNP1oNRPK8MtC5WbPhipG4+/Ygoh7CGqx4NXtJcigdNk71liILkPbB0e8oQvWccaE=)
   expiration: 3600000

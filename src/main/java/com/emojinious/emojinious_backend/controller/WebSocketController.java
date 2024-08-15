@@ -62,6 +62,7 @@ public class WebSocketController {
     @SendTo("/topic/game/{sessionId}")
     public GameStateDto joinGame(@DestinationVariable String sessionId,
                                  SimpMessageHeaderAccessor headerAccessor) {
+        System.out.println("WebSocketController.joinGame");
         String playerId = (String) headerAccessor.getSessionAttributes().get("playerId");
         String nickname = (String) headerAccessor.getSessionAttributes().get("nickname");
         return gameService.joinGame(sessionId, playerId, nickname);
