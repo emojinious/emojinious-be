@@ -2,11 +2,10 @@ package com.emojinious.emojinious_backend.service;
 
 import com.emojinious.emojinious_backend.cache.Player;
 import com.emojinious.emojinious_backend.dto.KeywordRequest;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.IOException;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
@@ -19,23 +18,59 @@ public class RandomWordGenerator {
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private static final String API_URL = "https://api.openai.com/v1/chat/completions";
+    private final RedisTemplate<String, String> redisTemplate;
 
     @Value("${openai.api-key}")
     private String API_KEY;
-    public RandomWordGenerator(RestTemplate restTemplate) {
+
+    public RandomWordGenerator(RestTemplate restTemplate, RedisTemplate<String, String> redisTemplate) {
         this.restTemplate = restTemplate;
+        this.redisTemplate = redisTemplate;
     }
 
-    public Map<String, String> getKeywordsFromTheme(List<Player> players, String theme, int numberOfKeywords) {
-        // API 요청 데이터 생성
-        KeywordRequest request = new KeywordRequest(theme, numberOfKeywords);
-        // API 호출
-        String response = callOpenAI(request);
-        // 응답 처리
-        return parseResponse(players, response);
+    public Map<String, String> getKeywordsFromTheme(List<Player> players, String theme, String difficulty, int numberOfKeywords) {
+        String cacheKey = "keywords:" + theme + ":" + difficulty;
+        List<String> cachedKeywords = getCachedKeywords(cacheKey);
+
+        if (cachedKeywords.isEmpty()) {
+            cachedKeywords = generateAndCacheKeywords(theme, difficulty);
+        }
+
+        return assignKeywordsToPlayers(players, cachedKeywords, numberOfKeywords);
     }
 
-    private String callOpenAI(KeywordRequest request) {
+    private List<String> getCachedKeywords(String cacheKey) {
+        String cachedValue = redisTemplate.opsForValue().get(cacheKey);
+        if (cachedValue != null) {
+            return Arrays.asList(cachedValue.split(","));
+        }
+        return new ArrayList<>();
+    }
+
+    private List<String> generateAndCacheKeywords(String theme, String difficulty) {
+        KeywordRequest request = new KeywordRequest(theme, 100);
+        String response = callOpenAI(request, difficulty);
+        List<String> keywords = parseResponse(response);
+
+        if (!keywords.isEmpty()) {
+            String cacheKey = "keywords:" + theme + ":" + difficulty;
+            redisTemplate.opsForValue().set(cacheKey, String.join(",", keywords));
+            redisTemplate.expire(cacheKey, 24 * 60 * 60 * 7, java.util.concurrent.TimeUnit.SECONDS); // 일주일
+        }
+
+        return keywords;
+    }
+
+    private Map<String, String> assignKeywordsToPlayers(List<Player> players, List<String> keywords, int numberOfKeywords) {
+        Collections.shuffle(keywords);
+        Map<String, String> result = new HashMap<>();
+        for (int i = 0; i < players.size() && i < numberOfKeywords && i < keywords.size(); i++) {
+            result.put(players.get(i).getId(), keywords.get(i));
+        }
+        return result;
+    }
+
+    private String callOpenAI(KeywordRequest request, String difficulty) {
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "Bearer " + API_KEY);
         headers.set("Content-Type", "application/json");
@@ -44,13 +79,13 @@ public class RandomWordGenerator {
         Random random = new Random();
         String actionWord = variations[random.nextInt(variations.length)];
         int seed = random.nextInt(1_000_000);
-        String prompt = "Current time(seed): " + System.currentTimeMillis() + actionWord +
-                request.getNumberOfKeywords() + " Korean keywords for the theme [ " +
-                request.getTheme() + " ], where each keyword is a set of up to " +
+        String prompt = "Current time(seed): " + System.currentTimeMillis() + " " + actionWord +
+                " 100 Korean keywords for the theme [ " +
+                request.getTheme() + " ] with " + difficulty + " difficulty, where each keyword is a set of up to " +
                 1 + " words. Response format: Answer the keywords without any other phrases, separated by commas.";
-        // OpenAI API 요청 본문 생성
+
         String requestBody = String.format(
-                "{\"model\": \"gpt-4\", \"messages\": [{\"role\": \"user\", \"content\": \"%s\"}], \"max_tokens\": 1000, \"temperature\": 2, \"seed\": %d}",
+                "{\"model\": \"gpt-4\", \"messages\": [{\"role\": \"user\", \"content\": \"%s\"}], \"max_tokens\": 2000, \"temperature\": 2, \"seed\": %d}",
                 prompt, seed
         );
 
@@ -63,39 +98,23 @@ public class RandomWordGenerator {
         }
     }
 
-
-    public Map<String, String> parseResponse(List<Player> players, String jsonResponse) {
-        String content;
+    private List<String> parseResponse(String jsonResponse) {
         try {
             JsonNode rootNode = objectMapper.readTree(jsonResponse);
-            content = rootNode.path("choices")
+            String content = rootNode.path("choices")
                     .path(0)
                     .path("message")
                     .path("content")
                     .asText();
-        } catch (JsonProcessingException e) {
-            return Collections.emptyMap();
-        }
 
-        List<String> words = new ArrayList<>();
-        Map<String, String> result = new HashMap<>();
-
-        System.out.println("content = " + content);
-        if (content != null && !content.isEmpty()) {
-            words = Arrays.stream(content.split(","))
-                    .map(String::trim)
-                    .collect(Collectors.toList());
-        }
-
-        for (int i = 0; i < players.size(); i++) {
-            if (i < words.size()) {
-                result.put(players.get(i).getId(), words.get(i));
-            } else {
-                result.put(players.get(i).getId(), "");
+            if (content != null && !content.isEmpty()) {
+                return Arrays.stream(content.split(","))
+                        .map(String::trim)
+                        .collect(Collectors.toList());
             }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
-
-        return result;
+        return new ArrayList<>();
     }
-
 }

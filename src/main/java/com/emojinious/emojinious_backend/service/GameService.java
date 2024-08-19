@@ -96,7 +96,12 @@ public class GameService {
         System.out.println("GameService.startDescriptionPhase");
         gameSession.setCurrentPhase(GamePhase.DESCRIPTION);
         messageUtil.broadcastPhaseStartMessage(gameSession.getSessionId(), gameSession.getCurrentPhase(), "Keyword Generation");
-        Map<String, String> keywords = randomWordGenerator.getKeywordsFromTheme(gameSession.getPlayers(), gameSession.getSettings().getTheme(), gameSession.getPlayers().size());
+        Map<String, String> keywords = randomWordGenerator.getKeywordsFromTheme(
+                gameSession.getPlayers(),
+                gameSession.getSettings().getTheme(),
+                gameSession.getSettings().getDifficulty(),
+                gameSession.getPlayers().size()
+        );
         gameSession.getPlayers().forEach(player ->
                 messageUtil.sendToPlayer(gameSession.getSessionId(), player.getSocketId(), "keyword", keywords.get(player.getId())));
         messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
