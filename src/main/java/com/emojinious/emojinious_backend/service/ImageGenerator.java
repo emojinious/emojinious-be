@@ -8,6 +8,8 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.concurrent.CompletableFuture;
+
 @Component
 public class ImageGenerator {
 
@@ -21,13 +23,12 @@ public class ImageGenerator {
         this.restTemplate = restTemplate;
     }
 
-    public String getImagesFromMessage(String message) {
-        // API 요청 데이터 생성
-        PromptSubmissionMessage prompt = new PromptSubmissionMessage(message);
-        // API 호출
-        String response = callImageAI(prompt);
-        // 응답에서 이미지 URL 추출
-        return parseResponse(response);
+    public CompletableFuture<String> getImagesFromMessageAsync(String message) {
+        return CompletableFuture.supplyAsync(() -> {
+            PromptSubmissionMessage prompt = new PromptSubmissionMessage(message);
+            String response = callImageAI(prompt);
+            return parseResponse(response);
+        });
     }
 
     private String callImageAI(PromptSubmissionMessage prompt) {
@@ -39,7 +40,6 @@ public class ImageGenerator {
                 "{\"model\": \"dall-e-3\",\"prompt\": \"%s\", \"n\": 1, \"size\": \"1024x1024\"}",
                 "Create an cute ink sketch emoji style illustration of the following: " + prompt
         );
-
 
         HttpEntity<String> request = new HttpEntity<>(requestBody, headers);
         ResponseEntity<String> responseEntity = restTemplate.exchange(API_URL, HttpMethod.POST, request, String.class);

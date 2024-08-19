@@ -79,6 +79,7 @@ public class RandomWordGenerator {
         Random random = new Random();
         String actionWord = variations[random.nextInt(variations.length)];
         int seed = random.nextInt(1_000_000);
+        // TODO: 난이도 로직 수정해야됨
         String prompt = "Current time(seed): " + System.currentTimeMillis() + " " + actionWord +
                 " 100 Korean keywords for the theme [ " +
                 request.getTheme() + " ] with " + difficulty + " difficulty, where each keyword is a set of up to " +

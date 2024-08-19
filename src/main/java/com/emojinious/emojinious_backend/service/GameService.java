@@ -8,6 +8,7 @@ import com.emojinious.emojinious_backend.constant.GameState;
 import com.emojinious.emojinious_backend.util.JwtUtil;
 import com.emojinious.emojinious_backend.util.RedisUtil;
 import com.emojinious.emojinious_backend.util.MessageUtil;
+import java.util.concurrent.CompletableFuture;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
@@ -115,17 +116,23 @@ public class GameService {
         messageUtil.broadcastPhaseStartMessage(gameSession.getSessionId(), gameSession.getCurrentPhase(), "Image Generation");
         messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
 
-        // TODO: 동시 요청, 이미지 생성 후 바로 다음 페이즈로 넘어가도록 수정
+        List<CompletableFuture<Void>> futures = new ArrayList<>();
+
         gameSession.getCurrentPrompts().forEach((playerId, prompt) -> {
-            System.out.println("prompt = " + prompt);
-            String imageUrl = imageGenerator.getImagesFromMessage(prompt);
-            gameSession.setGeneratedImage(playerId, imageUrl);
+            CompletableFuture<Void> future = imageGenerator.getImagesFromMessageAsync(prompt)
+                    .thenAccept(imageUrl -> {
+                        gameSession.setGeneratedImage(playerId, imageUrl);
+                        System.out.println("img gen player: " + playerId);
+                    });
+            futures.add(future);
         });
 
-        if (gameSession.areAllImagesGenerated()) {
-            startCheckingPhase(gameSession);
-        }
-        System.out.println("gameSession = " + gameSession);
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+                .thenRun(() -> {
+                    System.out.println("all images generated");
+                    startCheckingPhase(gameSession);
+                });
+        System.out.println("chk timing");
     }
 
     private void startCheckingPhase(GameSession gameSession){
