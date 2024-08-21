@@ -8,15 +8,13 @@ import com.emojinious.emojinious_backend.constant.GameState;
 import com.emojinious.emojinious_backend.util.JwtUtil;
 import com.emojinious.emojinious_backend.util.RedisUtil;
 import com.emojinious.emojinious_backend.util.MessageUtil;
+import java.util.concurrent.CompletableFuture;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.scheduling.annotation.Scheduled;
 
-import java.util.List;
-import java.util.Map;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -43,69 +41,110 @@ public class GameService {
     }
 
     public GameStateDto startGame(String sessionId, String playerId) {
+        System.out.println("GameService.startGame");
         GameSession gameSession = getGameSession(sessionId);
         if (!gameSession.isHost(playerId)) {
             throw new IllegalStateException("Only host can start the game");
         }
         gameSession.startGame();
-        startDescriptionPhase(gameSession);
+        startLoadingPhase(gameSession);
         updateGameSession(gameSession);
         return createGameStateDto(gameSession);
     }
 
-    public GameStateDto submitPrompt(String sessionId, String playerId, String prompt) {
+//    public void generateKeywords(GameSession gameSession) {
+//        List<String> keywords = randomWordGenerator.getKeywordsFromTheme(gameSession.getSettings().getTheme(), gameSession.getPlayers().size());
+//        gameSession.getCurrentKeywords().clear();
+//        for (int i = 0; i < gameSession.getPlayers().size(); i++) {
+//            Player player = gameSession.getPlayers().get(i);
+//            if (i < keywords.size()) {
+//                gameSession.getCurrentKeywords().put(player.getId(), keywords.get(i));
+//            }
+//        }
+//        updateGameSession(gameSession);
+//    }
+
+    public GameStateDto submitPrompt(String sessionId, String playerId, String message) {
+        System.out.println("GameService.submitPrompt");
         GameSession gameSession = getGameSession(sessionId);
-        gameSession.submitPrompt(playerId, prompt);
+        gameSession.submitPrompt(playerId, message);
+        // String image = imageGenerator.getImagesFromMessage(message);
+        // gameSession.saveImage(playerId, image);
         updateSubmissionProgress(gameSession, "prompt");
-        if (gameSession.getCurrentPrompts().size() == gameSession.getPlayers().size()) {
-            startGenerationPhase(gameSession);
-        }
+//        if (gameSession.getCurrentPrompts().size() == gameSession.getPlayers().size()) {
+//            gameSession.moveToNextPhase();
+//        }
         updateGameSession(gameSession);
         messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
+        System.out.println("gameSession = " + gameSession);
         return createGameStateDto(gameSession);
     }
+
 
     public GameStateDto submitGuess(String sessionId, String playerId, String guess) {
         GameSession gameSession = getGameSession(sessionId);
         gameSession.submitGuess(playerId, guess);
         updateSubmissionProgress(gameSession, "guess");
-        if (gameSession.getCurrentGuesses().size() == gameSession.getPlayers().size()) {
-            moveToNextPhase(gameSession);
-        }
+//        if (gameSession.getCurrentGuesses().size() == gameSession.getPlayers().size()) {
+//            moveToNextPhase(gameSession);
+//        }
         updateGameSession(gameSession);
         messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
         return createGameStateDto(gameSession);
     }
 
+    private void startLoadingPhase(GameSession gameSession) {
+        System.out.println("GameService.startLoadingPhase");
+        messageUtil.broadcastPhaseStartMessage(gameSession.getSessionId(), gameSession.getCurrentPhase(), "Keyword Generation");
+        Map<String, String> keywords = randomWordGenerator.getKeywordsFromTheme(
+                gameSession.getPlayers(),
+                gameSession.getSettings().getTheme(),
+                gameSession.getSettings().getDifficulty(),
+                gameSession.getPlayers().size()
+        );
+        gameSession.getCurrentKeywords().clear();
+        gameSession.getCurrentKeywords().putAll(keywords);
+        updateGameSession(gameSession);
+        moveToNextPhase(gameSession);
+    }
+
     private void startDescriptionPhase(GameSession gameSession) {
+        System.out.println("GameService.startDescriptionPhase");
         gameSession.setCurrentPhase(GamePhase.DESCRIPTION);
-        messageUtil.broadcastPhaseStartMessage(gameSession.getSessionId(), gameSession.getCurrentPhase(), "KeyWord Generation");
-        Map<String, String> keywords = randomWordGenerator.generateKeywords(gameSession.getPlayers());
-        gameSession.setCurrentKeywords(keywords);
+        System.out.println("gameSession.getCurrentKeywords() = " + gameSession.getCurrentKeywords());
         gameSession.getPlayers().forEach(player ->
-                messageUtil.sendToPlayer(gameSession.getSessionId(), player.getSocketId(), "keyword", keywords.get(player.getId())));
+                messageUtil.sendToPlayer(gameSession.getSessionId(), player.getSocketId(), "keyword", gameSession.getCurrentKeywords().get(player.getId())));
         messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
         messageUtil.broadcastPhaseStartMessage(gameSession.getSessionId(), gameSession.getCurrentPhase(), "Description Phase");
         updateSubmissionProgress(gameSession, "prompt");
     }
 
-    private void startGenerationPhase(GameSession gameSession) {
+    private void startGenerationPhase(GameSession gameSession) { // 프롬프트 안쓴애들 처리
+        System.out.println("GameService.startGenerationPhase");
         gameSession.setCurrentPhase(GamePhase.GENERATION);
         messageUtil.broadcastPhaseStartMessage(gameSession.getSessionId(), gameSession.getCurrentPhase(), "Image Generation");
         messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
 
-        // TODO: 동시 요청, 이미지 생성 후 바로 다음 페이즈로 넘어가도록 수정
+        List<CompletableFuture<Void>> futures = new ArrayList<>();
+
         gameSession.getCurrentPrompts().forEach((playerId, prompt) -> {
-            String imageUrl = imageGenerator.generateImage(prompt);
-            gameSession.setGeneratedImage(playerId, imageUrl);
+            CompletableFuture<Void> future = imageGenerator.getImagesFromMessageAsync(prompt)
+                    .thenAccept(imageUrl -> {
+                        gameSession.setGeneratedImage(playerId, imageUrl);
+                        System.out.println("img gen player: " + playerId);
+                    });
+            futures.add(future);
         });
 
-        if (gameSession.areAllImagesGenerated()) {
-            startCheckingPhase(gameSession);
-        }
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+                .thenRun(() -> {
+                    System.out.println("all images generated");
+                    startCheckingPhase(gameSession);
+                });
     }
 
     private void startCheckingPhase(GameSession gameSession){
+        System.out.println("GameService.startCheckingPhase");
         gameSession.setCurrentPhase(GamePhase.CHECKING);
         messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
         messageUtil.broadcastPhaseStartMessage(gameSession.getSessionId(), gameSession.getCurrentPhase(), "Checking Phase");
@@ -117,14 +156,30 @@ public class GameService {
     }
 
 
+
     private void startGuessingPhase(GameSession gameSession) {
+        System.out.println("GameService.startGuessingPhase");
         gameSession.setCurrentPhase(GamePhase.GUESSING);
-        messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
-        messageUtil.broadcastPhaseStartMessage(gameSession.getSessionId(), gameSession.getCurrentPhase(), "Guessing Phase");
+        startNewGuessRound(gameSession);
+//        messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
+//        messageUtil.broadcastPhaseStartMessage(gameSession.getSessionId(), gameSession.getCurrentPhase(), "Guessing Phase");
+//        assignImagesToPlayers(gameSession);
+//        messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
+    }
+
+    private void assignImagesToPlayers(GameSession gameSession) {
         gameSession.getPlayers().forEach(player -> {
             String imageUrl = getNextImageForPlayer(gameSession, player.getId());
             messageUtil.sendToPlayer(gameSession.getSessionId(), player.getSocketId(), "image", imageUrl);
         });
+    }
+
+    private void startNewGuessRound(GameSession gameSession) {
+        gameSession.startNewGuessRound();
+        assignImagesToPlayers(gameSession);
+        messageUtil.broadcastPhaseStartMessage(gameSession.getSessionId(), gameSession.getCurrentPhase(),
+                "Guessing Round " + gameSession.getCurrentGuessRound());
+        updateSubmissionProgress(gameSession, "guess");
         messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
     }
 
@@ -176,18 +231,38 @@ public class GameService {
 
     @Scheduled(fixedRate = 500)
     public void checkPhaseTimeouts() {
-        List<String> sessionIds = redisTemplate.keys(GAME_SESSION_KEY + "*").stream()
+        List<String> sessionIds = Objects.requireNonNull(redisTemplate.keys(GAME_SESSION_KEY + "*")).stream()
                 .map(key -> key.replace(GAME_SESSION_KEY, ""))
-                .collect(Collectors.toList());
+                .toList();
 
         for (String sessionId : sessionIds) {
             GameSession gameSession = getGameSession(sessionId);
-            if (gameSession.getState() == GameState.IN_PROGRESS && gameSession.isPhaseTimedOut()) {
-                moveToNextPhase(gameSession);
+            if (gameSession.getState() == GameState.IN_PROGRESS) {
+                if (gameSession.getCurrentPhase() == GamePhase.GUESSING) {
+                    handleGuessingPhaseTimeout(gameSession);
+                } else if (gameSession.isPhaseTimedOut()) {
+                    moveToNextPhase(gameSession);
+                } else {
+                    continue;
+                }
                 updateGameSession(gameSession);
                 messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
             }
         }
+    }
+
+    private void handleGuessingPhaseTimeout(GameSession gameSession) {
+        if (shouldMoveToNextRoundOrPhase(gameSession)) {
+            if (gameSession.getCurrentGuessRound() < gameSession.getPlayers().size() - 1) {
+                startNewGuessRound(gameSession);
+            } else {
+                moveToNextPhase(gameSession);
+            }
+        }
+    }
+
+    private boolean shouldMoveToNextRoundOrPhase(GameSession gameSession) {
+        return gameSession.areAllPlayersGuessedOrTimedOut(gameSession.getSettings().getGuessTimeLimit());
     }
 
     private GameSession getOrCreateGameSession(String sessionId) {
@@ -195,7 +270,7 @@ public class GameService {
         return gameSession != null ? gameSession : new GameSession(sessionId);
     }
 
-    private GameSession getGameSession(String sessionId) {
+    public GameSession getGameSession(String sessionId) {
         GameSession gameSession = redisUtil.get(GAME_SESSION_KEY + sessionId, GameSession.class);
         if (gameSession == null) {
             throw new IllegalStateException("Game session not found");
@@ -252,16 +327,8 @@ public class GameService {
     }
 
     private String getNextImageForPlayer(GameSession gameSession, String playerId) {
-        List<String> playerIds = gameSession.getPlayers().stream()
-                .map(Player::getId)
-                .collect(Collectors.toList());
-        int currentIndex = playerIds.indexOf(playerId);
-        int nextIndex = (currentIndex + 1) % playerIds.size();
-        String nextPlayerId = playerIds.get(nextIndex);
-
-        playerIds.set(currentIndex, nextPlayerId);
-
-        return gameSession.getGeneratedImages().get(nextPlayerId);
+        String targetPlayerId = gameSession.getGuessTargetForPlayer(playerId);
+        return gameSession.getGeneratedImages().get(targetPlayerId);
     }
 
     public void refreshPlayerToken(String sessionId, String playerId) {

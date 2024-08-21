@@ -4,6 +4,7 @@ import com.emojinious.emojinious_backend.cache.Player;
 import com.emojinious.emojinious_backend.constant.GamePhase;
 import com.emojinious.emojinious_backend.constant.GameState;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import java.util.stream.Collectors;
 import lombok.Data;
 import java.io.Serializable;
 import java.util.*;
@@ -23,6 +24,9 @@ public class GameSession implements Serializable {
     private Map<String, String> generatedImages;
     private long phaseStartTime;
     private long phaseEndTime;
+    private int currentGuessRound;
+    private Map<String, Set<String>> guessedPlayers;
+    private long currentRoundStartTime;
 
     public GameSession() {
         // 역직렬화 문제 방지, 이제필요없음(아마도)
@@ -39,6 +43,9 @@ public class GameSession implements Serializable {
         this.currentGuesses = new HashMap<>();
         this.currentKeywords = new HashMap<>();
         this.generatedImages = new HashMap<>();
+        this.currentGuessRound = 0;
+        this.guessedPlayers = new HashMap<>();
+        this.currentRoundStartTime = 0;
     }
 
     public void addPlayer(Player player) {
@@ -64,6 +71,9 @@ public class GameSession implements Serializable {
     public void moveToNextPhase() {
         switch (currentPhase) {
             case WAITING:
+                currentPhase = GamePhase.LOADING;
+                break;
+            case LOADING:
                 currentPhase = GamePhase.DESCRIPTION;
                 break;
             case DESCRIPTION:
@@ -103,11 +113,11 @@ public class GameSession implements Serializable {
             case GUESSING:
                 phaseEndTime = phaseStartTime + (settings.getGuessTimeLimit() * 1000L);
                 break;
-            case GENERATION:
-                phaseEndTime = phaseStartTime + 10000; // 10초
+            case CHECKING:
+                phaseEndTime = phaseStartTime + 10 * 1000;
                 break;
             default:
-                phaseEndTime = phaseStartTime + 10000; // 10초
+                phaseEndTime = phaseStartTime + 60 * 10 * 1000;
         }
     }
 
@@ -131,13 +141,17 @@ public class GameSession implements Serializable {
     }
 
     public void submitPrompt(String playerId, String prompt) {
-        if (currentPhase != GamePhase.DESCRIPTION) {
-            throw new IllegalStateException("Not in description phase");
+        if (state != GameState.IN_PROGRESS) {
+            throw new IllegalStateException("Game is not in progress");
         }
         currentPrompts.put(playerId, prompt);
-        if (currentPrompts.size() == players.size()) {
-            moveToNextPhase();
+    }
+
+    public void saveImage(String playerId, String image) {
+        if (state != GameState.IN_PROGRESS) {
+            throw new IllegalStateException("Game is not in progress");
         }
+        generatedImages.put(playerId, image);
     }
 
     public void submitGuess(String playerId, String guess) {
@@ -153,6 +167,38 @@ public class GameSession implements Serializable {
     public void setGeneratedImage(String playerId, String imageUrl) {
         generatedImages.put(playerId, imageUrl);
     }
+
+
+    public void startNewGuessRound() {
+        currentGuessRound++;
+        currentGuesses.clear();
+        players.forEach(player -> guessedPlayers.put(player.getId(), new HashSet<>()));
+        currentRoundStartTime = System.currentTimeMillis();
+    }
+
+    public boolean areAllPlayersGuessedOrTimedOut(int guessTimeLimit) {
+        return players.stream().allMatch(player ->
+                hasPlayerGuessedAllOthers(player.getId()) || isCurrentRoundTimedOut(guessTimeLimit)
+        );
+    }
+
+    private boolean isCurrentRoundTimedOut(int guessTimeLimit) {
+        return System.currentTimeMillis() > currentRoundStartTime + guessTimeLimit * 1000L;
+    }
+
+    private boolean hasPlayerGuessedAllOthers(String playerId) {
+        Set<String> guessedSet = this.guessedPlayers.get(playerId);
+        return guessedSet != null && guessedSet.size() == players.size() - 1;
+    }
+
+
+    public String getGuessTargetForPlayer(String playerId) {
+        List<String> playerIds = players.stream().map(Player::getId).toList();
+        int playerIndex = playerIds.indexOf(playerId);
+        int targetIndex = (playerIndex + currentGuessRound) % playerIds.size();
+        return playerIds.get(targetIndex);
+    }
+
 
     public boolean areAllImagesGenerated() {
         return generatedImages.size() == players.size();
