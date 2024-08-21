@@ -17,7 +17,7 @@ public class GameSettings implements Serializable {
         this.promptTimeLimit = 20;
         this.guessTimeLimit = 15;
         this.difficulty = "NORMAL";
-        this.turns = 3;
+        this.turns = 1;
         this.theme = "RANDOM";
     }
 }

@@ -26,17 +26,37 @@ public class GameSessionService {
         }
 
         String gameSettingsKey = "game:settings:" + sessionId;
-        redisUtil.set(gameSettingsKey, settings);
+        GameSettings currentSettings = redisUtil.get(gameSettingsKey, GameSettings.class);
+        if (currentSettings == null) {
+            currentSettings = new GameSettings();
+        }
+
+        updateSettingsIfPresent(currentSettings, settings);
+
+        redisUtil.set(gameSettingsKey, currentSettings);
 
         GameSession gameSession = redisUtil.get("game:session:" + sessionId, GameSession.class);
         if (gameSession != null) {
-            GameSettings gameSettings = gameSession.getSettings();
-            gameSettings.setPromptTimeLimit(settings.getPromptTimeLimit());
-            gameSettings.setGuessTimeLimit(settings.getGuessTimeLimit());
-            gameSettings.setDifficulty(settings.getDifficulty());
-            gameSettings.setTurns(settings.getTurns());
-            gameSettings.setTheme(settings.getTheme());
+            gameSession.setSettings(currentSettings);
             redisUtil.set("game:session:" + sessionId, gameSession);
+        }
+    }
+
+    private void updateSettingsIfPresent(GameSettings currentSettings, GameSettingsDto newSettings) {
+        if (newSettings.getPromptTimeLimit() != null) {
+            currentSettings.setPromptTimeLimit(newSettings.getPromptTimeLimit());
+        }
+        if (newSettings.getGuessTimeLimit() != null) {
+            currentSettings.setGuessTimeLimit(newSettings.getGuessTimeLimit());
+        }
+        if (newSettings.getDifficulty() != null) {
+            currentSettings.setDifficulty(newSettings.getDifficulty());
+        }
+        if (newSettings.getTurns() != null) {
+            currentSettings.setTurns(newSettings.getTurns());
+        }
+        if (newSettings.getTheme() != null) {
+            currentSettings.setTheme(newSettings.getTheme());
         }
     }
 }
