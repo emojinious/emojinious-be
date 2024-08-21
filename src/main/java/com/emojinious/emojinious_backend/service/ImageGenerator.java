@@ -38,7 +38,7 @@ public class ImageGenerator {
 
         String requestBody = String.format(
                 "{\"model\": \"dall-e-3\",\"prompt\": \"%s\", \"n\": 1, \"size\": \"1024x1024\"}",
-                "Create an cute ink sketch emoji style illustration of the following: " + prompt
+                "Create an cute emoji style illustration of the following: " + prompt
         );
 
         HttpEntity<String> request = new HttpEntity<>(requestBody, headers);

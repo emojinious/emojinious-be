@@ -74,6 +74,7 @@ public class RandomWordGenerator {
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "Bearer " + API_KEY);
         headers.set("Content-Type", "application/json");
+        System.out.println(API_KEY);
 
         String[] variations = {"Generate", "Create", "Produce", "Come up with", "Devise"};
         Random random = new Random();
@@ -81,12 +82,12 @@ public class RandomWordGenerator {
         int seed = random.nextInt(1_000_000);
         // TODO: 난이도 로직 수정해야됨
         String prompt = "Current time(seed): " + System.currentTimeMillis() + " " + actionWord +
-                " 100 Korean keywords for the theme [ " +
+                " 30 Korean keywords for the theme [ " +
                 request.getTheme() + " ] with " + difficulty + " difficulty, where each keyword is a set of up to " +
                 1 + " words. Response format: Answer the keywords without any other phrases, separated by commas.";
 
         String requestBody = String.format(
-                "{\"model\": \"gpt-4\", \"messages\": [{\"role\": \"user\", \"content\": \"%s\"}], \"max_tokens\": 2000, \"temperature\": 2, \"seed\": %d}",
+                "{\"model\": \"gpt-4\", \"messages\": [{\"role\": \"user\", \"content\": \"%s\"}], \"max_tokens\": 8000, \"temperature\": 0.2, \"seed\": %d}",
                 prompt, seed
         );
 

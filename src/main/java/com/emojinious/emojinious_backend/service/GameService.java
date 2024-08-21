@@ -47,7 +47,7 @@ public class GameService {
             throw new IllegalStateException("Only host can start the game");
         }
         gameSession.startGame();
-        startDescriptionPhase(gameSession);
+        startLoadingPhase(gameSession);
         updateGameSession(gameSession);
         return createGameStateDto(gameSession);
     }
@@ -85,17 +85,16 @@ public class GameService {
         GameSession gameSession = getGameSession(sessionId);
         gameSession.submitGuess(playerId, guess);
         updateSubmissionProgress(gameSession, "guess");
-        if (gameSession.getCurrentGuesses().size() == gameSession.getPlayers().size()) {
-            moveToNextPhase(gameSession);
-        }
+//        if (gameSession.getCurrentGuesses().size() == gameSession.getPlayers().size()) {
+//            moveToNextPhase(gameSession);
+//        }
         updateGameSession(gameSession);
         messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
         return createGameStateDto(gameSession);
     }
 
-    private void startDescriptionPhase(GameSession gameSession) {
-        System.out.println("GameService.startDescriptionPhase");
-        gameSession.setCurrentPhase(GamePhase.DESCRIPTION);
+    private void startLoadingPhase(GameSession gameSession) {
+        System.out.println("GameService.startLoadingPhase");
         messageUtil.broadcastPhaseStartMessage(gameSession.getSessionId(), gameSession.getCurrentPhase(), "Keyword Generation");
         Map<String, String> keywords = randomWordGenerator.getKeywordsFromTheme(
                 gameSession.getPlayers(),
@@ -103,14 +102,24 @@ public class GameService {
                 gameSession.getSettings().getDifficulty(),
                 gameSession.getPlayers().size()
         );
+        gameSession.getCurrentKeywords().clear();
+        gameSession.getCurrentKeywords().putAll(keywords);
+        updateGameSession(gameSession);
+        moveToNextPhase(gameSession);
+    }
+
+    private void startDescriptionPhase(GameSession gameSession) {
+        System.out.println("GameService.startDescriptionPhase");
+        gameSession.setCurrentPhase(GamePhase.DESCRIPTION);
+        System.out.println("gameSession.getCurrentKeywords() = " + gameSession.getCurrentKeywords());
         gameSession.getPlayers().forEach(player ->
-                messageUtil.sendToPlayer(gameSession.getSessionId(), player.getSocketId(), "keyword", keywords.get(player.getId())));
+                messageUtil.sendToPlayer(gameSession.getSessionId(), player.getSocketId(), "keyword", gameSession.getCurrentKeywords().get(player.getId())));
         messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
         messageUtil.broadcastPhaseStartMessage(gameSession.getSessionId(), gameSession.getCurrentPhase(), "Description Phase");
         updateSubmissionProgress(gameSession, "prompt");
     }
 
-    private void startGenerationPhase(GameSession gameSession) {
+    private void startGenerationPhase(GameSession gameSession) { // 프롬프트 안쓴애들 처리
         System.out.println("GameService.startGenerationPhase");
         gameSession.setCurrentPhase(GamePhase.GENERATION);
         messageUtil.broadcastPhaseStartMessage(gameSession.getSessionId(), gameSession.getCurrentPhase(), "Image Generation");
@@ -132,7 +141,6 @@ public class GameService {
                     System.out.println("all images generated");
                     startCheckingPhase(gameSession);
                 });
-        System.out.println("chk timing");
     }
 
     private void startCheckingPhase(GameSession gameSession){
@@ -148,15 +156,30 @@ public class GameService {
     }
 
 
+
     private void startGuessingPhase(GameSession gameSession) {
         System.out.println("GameService.startGuessingPhase");
         gameSession.setCurrentPhase(GamePhase.GUESSING);
-        messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
-        messageUtil.broadcastPhaseStartMessage(gameSession.getSessionId(), gameSession.getCurrentPhase(), "Guessing Phase");
+        startNewGuessRound(gameSession);
+//        messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
+//        messageUtil.broadcastPhaseStartMessage(gameSession.getSessionId(), gameSession.getCurrentPhase(), "Guessing Phase");
+//        assignImagesToPlayers(gameSession);
+//        messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
+    }
+
+    private void assignImagesToPlayers(GameSession gameSession) {
         gameSession.getPlayers().forEach(player -> {
             String imageUrl = getNextImageForPlayer(gameSession, player.getId());
             messageUtil.sendToPlayer(gameSession.getSessionId(), player.getSocketId(), "image", imageUrl);
         });
+    }
+
+    private void startNewGuessRound(GameSession gameSession) {
+        gameSession.startNewGuessRound();
+        assignImagesToPlayers(gameSession);
+        messageUtil.broadcastPhaseStartMessage(gameSession.getSessionId(), gameSession.getCurrentPhase(),
+                "Guessing Round " + gameSession.getCurrentGuessRound());
+        updateSubmissionProgress(gameSession, "guess");
         messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
     }
 
@@ -208,18 +231,38 @@ public class GameService {
 
     @Scheduled(fixedRate = 500)
     public void checkPhaseTimeouts() {
-        List<String> sessionIds = redisTemplate.keys(GAME_SESSION_KEY + "*").stream()
+        List<String> sessionIds = Objects.requireNonNull(redisTemplate.keys(GAME_SESSION_KEY + "*")).stream()
                 .map(key -> key.replace(GAME_SESSION_KEY, ""))
-                .collect(Collectors.toList());
+                .toList();
 
         for (String sessionId : sessionIds) {
             GameSession gameSession = getGameSession(sessionId);
-            if (gameSession.getState() == GameState.IN_PROGRESS && gameSession.isPhaseTimedOut()) {
-                moveToNextPhase(gameSession);
+            if (gameSession.getState() == GameState.IN_PROGRESS) {
+                if (gameSession.getCurrentPhase() == GamePhase.GUESSING) {
+                    handleGuessingPhaseTimeout(gameSession);
+                } else if (gameSession.isPhaseTimedOut()) {
+                    moveToNextPhase(gameSession);
+                } else {
+                    continue;
+                }
                 updateGameSession(gameSession);
                 messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
             }
         }
+    }
+
+    private void handleGuessingPhaseTimeout(GameSession gameSession) {
+        if (shouldMoveToNextRoundOrPhase(gameSession)) {
+            if (gameSession.getCurrentGuessRound() < gameSession.getPlayers().size() - 1) {
+                startNewGuessRound(gameSession);
+            } else {
+                moveToNextPhase(gameSession);
+            }
+        }
+    }
+
+    private boolean shouldMoveToNextRoundOrPhase(GameSession gameSession) {
+        return gameSession.areAllPlayersGuessedOrTimedOut(gameSession.getSettings().getGuessTimeLimit());
     }
 
     private GameSession getOrCreateGameSession(String sessionId) {
@@ -284,16 +327,8 @@ public class GameService {
     }
 
     private String getNextImageForPlayer(GameSession gameSession, String playerId) {
-        List<String> playerIds = gameSession.getPlayers().stream()
-                .map(Player::getId)
-                .collect(Collectors.toList());
-        int currentIndex = playerIds.indexOf(playerId);
-        int nextIndex = (currentIndex + 1) % playerIds.size();
-        String nextPlayerId = playerIds.get(nextIndex);
-
-        playerIds.set(currentIndex, nextPlayerId);
-
-        return gameSession.getGeneratedImages().get(nextPlayerId);
+        String targetPlayerId = gameSession.getGuessTargetForPlayer(playerId);
+        return gameSession.getGeneratedImages().get(targetPlayerId);
     }
 
     public void refreshPlayerToken(String sessionId, String playerId) {

@@ -58,6 +58,7 @@ public class WebSocketController {
         return "Connection failed";
     }
 
+    // TODO: 모든 요청에 대해 페이즈 검사 후 수락/거절
     @MessageMapping("/game/{sessionId}/join")
     @SendTo("/topic/game/{sessionId}")
     public GameStateDto joinGame(@DestinationVariable String sessionId,
