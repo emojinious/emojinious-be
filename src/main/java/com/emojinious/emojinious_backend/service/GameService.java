@@ -47,8 +47,8 @@ public class GameService {
             throw new IllegalStateException("Only host can start the game");
         }
         gameSession.startGame();
-        startLoadingPhase(gameSession);
         updateGameSession(gameSession);
+        startLoadingPhase(gameSession);
         return createGameStateDto(gameSession);
     }
 
@@ -110,8 +110,6 @@ public class GameService {
 
     private void startDescriptionPhase(GameSession gameSession) {
         System.out.println("GameService.startDescriptionPhase");
-        gameSession.setCurrentPhase(GamePhase.DESCRIPTION);
-        System.out.println("gameSession.getCurrentKeywords() = " + gameSession.getCurrentKeywords());
         gameSession.getPlayers().forEach(player ->
                 messageUtil.sendToPlayer(gameSession.getSessionId(), player.getSocketId(), "keyword", gameSession.getCurrentKeywords().get(player.getId())));
         messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
@@ -121,11 +119,12 @@ public class GameService {
 
     private void startGenerationPhase(GameSession gameSession) { // 프롬프트 안쓴애들 처리
         System.out.println("GameService.startGenerationPhase");
-        gameSession.setCurrentPhase(GamePhase.GENERATION);
         messageUtil.broadcastPhaseStartMessage(gameSession.getSessionId(), gameSession.getCurrentPhase(), "Image Generation");
         messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
 
         List<CompletableFuture<Void>> futures = new ArrayList<>();
+
+        System.out.println("gameSession = " + gameSession.getCurrentPrompts());
 
         gameSession.getCurrentPrompts().forEach((playerId, prompt) -> {
             CompletableFuture<Void> future = imageGenerator.getImagesFromMessageAsync(prompt)
@@ -139,13 +138,13 @@ public class GameService {
         CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
                 .thenRun(() -> {
                     System.out.println("all images generated");
-                    startCheckingPhase(gameSession);
+                    updateGameSession(gameSession);
+                    moveToNextPhase(gameSession);
                 });
     }
 
     private void startCheckingPhase(GameSession gameSession){
         System.out.println("GameService.startCheckingPhase");
-        gameSession.setCurrentPhase(GamePhase.CHECKING);
         messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
         messageUtil.broadcastPhaseStartMessage(gameSession.getSessionId(), gameSession.getCurrentPhase(), "Checking Phase");
 
@@ -159,7 +158,6 @@ public class GameService {
 
     private void startGuessingPhase(GameSession gameSession) {
         System.out.println("GameService.startGuessingPhase");
-        gameSession.setCurrentPhase(GamePhase.GUESSING);
         startNewGuessRound(gameSession);
 //        messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
 //        messageUtil.broadcastPhaseStartMessage(gameSession.getSessionId(), gameSession.getCurrentPhase(), "Guessing Phase");
@@ -175,7 +173,9 @@ public class GameService {
     }
 
     private void startNewGuessRound(GameSession gameSession) {
+        System.out.println("GameService.startNewGuessRound");
         gameSession.startNewGuessRound();
+        updateGameSession(gameSession);
         assignImagesToPlayers(gameSession);
         messageUtil.broadcastPhaseStartMessage(gameSession.getSessionId(), gameSession.getCurrentPhase(),
                 "Guessing Round " + gameSession.getCurrentGuessRound());
@@ -184,7 +184,7 @@ public class GameService {
     }
 
     private void startTurnResultPhase(GameSession gameSession) {
-        gameSession.setCurrentPhase(GamePhase.TURN_RESULT);
+        System.out.println("GameService.startTurnResultPhase");
         messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
         messageUtil.broadcastPhaseStartMessage(gameSession.getSessionId(), gameSession.getCurrentPhase(), "Turn Result Phase");
 
@@ -195,6 +195,7 @@ public class GameService {
 
     private void moveToNextPhase(GameSession gameSession) {
         gameSession.moveToNextPhase();
+        updateGameSession(gameSession);
         switch (gameSession.getCurrentPhase()) {
             case DESCRIPTION:
                 startDescriptionPhase(gameSession);
@@ -215,11 +216,12 @@ public class GameService {
                 endGame(gameSession);
                 break;
         }
+        updateGameSession(gameSession);
     }
 
     private void endGame(GameSession gameSession) {
         gameSession.setState(GameState.FINISHED);
-        gameSession.setCurrentPhase(GamePhase.RESULT);
+        updateGameSession(gameSession);
         Map<String, Integer> scores = scoreCalculator.calculateScores(gameSession);
         gameSession.getPlayers().forEach(player ->
                 player.setScore(scores.get(player.getId())));
@@ -286,6 +288,8 @@ public class GameService {
         messageUtil.broadcastChatMessage(sessionId, message);
     }
 
+
+    // TODO: guessing 일 때 이것저것 정보 추가
     private GameStateDto createGameStateDto(GameSession gameSession) {
         GameStateDto dto = new GameStateDto();
         dto.setSessionId(gameSession.getSessionId());
@@ -317,12 +321,14 @@ public class GameService {
         return dto;
     }
 
+    // 굳이?
     private GameSettingsDto convertToGameSettingsDto(GameSettings settings) {
         GameSettingsDto dto = new GameSettingsDto();
         dto.setPromptTimeLimit(settings.getPromptTimeLimit());
         dto.setGuessTimeLimit(settings.getGuessTimeLimit());
         dto.setDifficulty(settings.getDifficulty());
         dto.setTurns(settings.getTurns());
+        dto.setTheme(settings.getTheme());
         return dto;
     }
 
@@ -355,6 +361,7 @@ public class GameService {
     public void handlePlayerDisconnect(String sessionId, String playerId) {
         GameSession gameSession = getGameSession(sessionId);
         gameSession.removePlayer(playerId);
+        updateGameSession(gameSession);
         if (gameSession.getPlayers().isEmpty()) {
             endGame(gameSession);
         } else {

@@ -69,6 +69,7 @@ public class GameSession implements Serializable {
     }
 
     public void moveToNextPhase() {
+        System.out.println("GameSession.moveToNextPhase curr: " + currentPhase);
         switch (currentPhase) {
             case WAITING:
                 currentPhase = GamePhase.LOADING;
@@ -105,6 +106,7 @@ public class GameSession implements Serializable {
     }
 
     public void startPhaseTimer() {
+        System.out.println("GameSession.startPhaseTimer : " + currentPhase);
         phaseStartTime = System.currentTimeMillis();
         switch (currentPhase) {
             case DESCRIPTION:
@@ -114,11 +116,12 @@ public class GameSession implements Serializable {
                 phaseEndTime = phaseStartTime + (settings.getGuessTimeLimit() * 1000L);
                 break;
             case CHECKING:
-                phaseEndTime = phaseStartTime + 10 * 1000;
+                phaseEndTime = phaseStartTime + 10 * 1000L;
                 break;
             default:
-                phaseEndTime = phaseStartTime + 60 * 10 * 1000;
+                phaseEndTime = phaseStartTime + 60 * 10 * 1000L;
         }
+        System.out.println("Time: " + (phaseEndTime - phaseStartTime) + " ms");
     }
 
     public boolean isPhaseTimedOut() {
@@ -159,9 +162,9 @@ public class GameSession implements Serializable {
             throw new IllegalStateException("Not in guessing phase");
         }
         currentGuesses.put(playerId, guess);
-        if (currentGuesses.size() == players.size()) {
-            moveToNextPhase();
-        }
+//        if (currentGuesses.size() == players.size()) {
+//            moveToNextPhase();
+//        }
     }
 
     public void setGeneratedImage(String playerId, String imageUrl) {
