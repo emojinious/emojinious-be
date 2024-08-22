@@ -81,11 +81,14 @@ public class RandomWordGenerator {
         String actionWord = variations[random.nextInt(variations.length)];
         int seed = random.nextInt(1_000_000);
         // TODO: 난이도 로직 수정해야됨
-        String prompt = "Current time(seed): " + System.currentTimeMillis() + " " + actionWord +
-                " 30 Korean keywords for the theme [ " +
-                request.getTheme() + " ] with " + difficulty + " difficulty, where each keyword is a set of up to " +
-                1 + " words. Response format: Answer the keywords without any other phrases, separated by commas.";
-
+        String prompt;
+        if ("무작위".equals(request.getTheme())) {
+            prompt = String.format("Current time(seed): %d %s 30 random Korean keywords with %s difficulty, where each keyword is a set of up to 1 word. Response format: Answer the keywords without any other phrases, separated by commas.",
+                    System.currentTimeMillis(), actionWord, difficulty);
+        } else {
+            prompt = String.format("Current time(seed): %d %s 30 Korean keywords for the theme [ %s ] with %s difficulty, where each keyword is a set of up to 1 word. Response format: Answer the keywords without any other phrases, separated by commas.",
+                    System.currentTimeMillis(), actionWord, request.getTheme(), difficulty);
+        }
         String requestBody = String.format(
                 "{\"model\": \"gpt-4\", \"messages\": [{\"role\": \"user\", \"content\": \"%s\"}], \"max_tokens\": 8000, \"temperature\": 0.2, \"seed\": %d}",
                 prompt, seed

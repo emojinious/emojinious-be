@@ -14,10 +14,10 @@ public class GameSettings implements Serializable {
 
     public GameSettings() {
         // Default settings
-        this.promptTimeLimit = 20;
-        this.guessTimeLimit = 15;
+        this.promptTimeLimit = 40;
+        this.guessTimeLimit = 30;
         this.difficulty = "NORMAL";
         this.turns = 1;
-        this.theme = "RANDOM";
+        this.theme = "무작위";
     }
 }
