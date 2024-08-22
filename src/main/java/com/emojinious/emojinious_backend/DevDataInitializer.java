@@ -16,7 +16,7 @@ public class DevDataInitializer implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        redisCleanupService.clearAllKeys();
-        System.out.println("All Redis keys have been cleared in the development environment.");
+//        redisCleanupService.clearAllKeys();
+//        System.out.println("All Redis keys have been cleared in the development environment.");
     }
 }

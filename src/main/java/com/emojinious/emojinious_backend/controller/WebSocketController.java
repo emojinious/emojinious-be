@@ -28,6 +28,7 @@ public class WebSocketController {
     @SendToUser("/queue/connect-ack")
     public String handleConnect(SimpMessageHeaderAccessor headerAccessor,
                                 @Payload ConnectMessage message) {
+        System.out.println("WebSocketController.handleConnect");
         String playerId = message.getPlayerId();
         String token = message.getToken();
 
@@ -38,6 +39,9 @@ public class WebSocketController {
                 Player player = playerService.getPlayerById(playerId);
 
                 if (player != null) {
+                    // 기존 연결 확인 및 처리
+                    gameService.handleExistingConnection(player.getSessionId(), playerId);
+
                     player.setSocketId(headerAccessor.getSessionId());
                     playerService.savePlayer(player);
                     headerAccessor.getSessionAttributes().put("player", player);
@@ -66,6 +70,12 @@ public class WebSocketController {
         System.out.println("WebSocketController.joinGame");
         String playerId = (String) headerAccessor.getSessionAttributes().get("playerId");
         String nickname = (String) headerAccessor.getSessionAttributes().get("nickname");
+
+        // 중복 참여 체크 및 처리
+        if (gameService.isPlayerAlreadyJoined(sessionId, playerId)) {
+            return gameService.getGameState(sessionId);
+        }
+
         return gameService.joinGame(sessionId, playerId, nickname);
     }
 

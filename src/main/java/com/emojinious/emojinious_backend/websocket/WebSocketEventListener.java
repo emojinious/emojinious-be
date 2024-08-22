@@ -27,12 +27,12 @@ public class WebSocketEventListener {
 
             if (sessionId != null && playerId != null) {
                 gameService.handlePlayerConnect(sessionId, playerId);
-                log.info("Player connected - sessionId: {}, playerId: {}", sessionId, playerId);
+                System.out.println("Player connected - sessionId: {}, playerId: {}" + sessionId + playerId);
             } else {
-                log.warn("Session attributes are incomplete - sessionId: {}, playerId: {}", sessionId, playerId);
+                System.out.println("Session attributes are incomplete - sessionId: {}, playerId: {}" + sessionId + playerId);
             }
         } else {
-            log.warn("Session attributes are null for the connected event");
+            System.out.println("Session attributes are null for the connected event");
         }
     }
 

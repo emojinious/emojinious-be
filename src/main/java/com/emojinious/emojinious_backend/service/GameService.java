@@ -9,6 +9,7 @@ import com.emojinious.emojinious_backend.util.JwtUtil;
 import com.emojinious.emojinious_backend.util.RedisUtil;
 import com.emojinious.emojinious_backend.util.MessageUtil;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
@@ -30,6 +31,22 @@ public class GameService {
     private final ScoreCalculator scoreCalculator;
 
     private static final String GAME_SESSION_KEY = "game:session:";
+    private final Map<String, Set<String>> activeConnections = new ConcurrentHashMap<>();
+
+    public void handleExistingConnection(String sessionId, String playerId) {
+        Set<String> sessionPlayers = activeConnections.computeIfAbsent(sessionId, k -> ConcurrentHashMap.newKeySet());
+        if (sessionPlayers.contains(playerId)) {
+            // 기존 연결 종료 처리
+            // messageUtil.sendDisconnectMessage(sessionId, playerId);
+            sessionPlayers.remove(playerId);
+        }
+    }
+
+    public boolean isPlayerAlreadyJoined(String sessionId, String playerId) {
+        GameSession gameSession = getGameSession(sessionId);
+        System.out.println(gameSession != null && gameSession.getPlayerById(playerId) != null);
+        return gameSession != null && gameSession.getPlayerById(playerId) != null;
+    }
 
     public GameStateDto joinGame(String sessionId, String playerId, String nickname) {
         GameSession gameSession = getOrCreateGameSession(sessionId);
@@ -127,6 +144,7 @@ public class GameService {
         System.out.println("gameSession = " + gameSession.getCurrentPrompts());
 
         gameSession.getCurrentPrompts().forEach((playerId, prompt) -> {
+            System.out.println("prompt = " + prompt);
             CompletableFuture<Void> future = imageGenerator.getImagesFromMessageAsync(prompt)
                     .thenAccept(imageUrl -> {
                         gameSession.setGeneratedImage(playerId, imageUrl);
@@ -247,8 +265,7 @@ public class GameService {
                 } else {
                     continue;
                 }
-                updateGameSession(gameSession);
-                messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
+//                messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
             }
         }
     }
@@ -269,15 +286,15 @@ public class GameService {
 
     private GameSession getOrCreateGameSession(String sessionId) {
         GameSession gameSession = redisUtil.get(GAME_SESSION_KEY + sessionId, GameSession.class);
-        return gameSession != null ? gameSession : new GameSession(sessionId);
+        if (gameSession == null) {
+            gameSession = new GameSession(sessionId);
+            updateGameSession(gameSession);
+        }
+        return gameSession;
     }
 
     public GameSession getGameSession(String sessionId) {
-        GameSession gameSession = redisUtil.get(GAME_SESSION_KEY + sessionId, GameSession.class);
-        if (gameSession == null) {
-            throw new IllegalStateException("Game session not found");
-        }
-        return gameSession;
+        return redisUtil.get(GAME_SESSION_KEY + sessionId, GameSession.class);
     }
 
     private void updateGameSession(GameSession gameSession) {
@@ -349,6 +366,7 @@ public class GameService {
     }
 
     public void handlePlayerConnect(String sessionId, String playerId) {
+        System.out.println("GameService.handlePlayerConnect");
         GameSession gameSession = getGameSession(sessionId);
         Player player = playerService.getPlayerById(playerId);
         if (player != null && !gameSession.getPlayers().contains(player)) {
