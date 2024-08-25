@@ -226,7 +226,7 @@ public class GameService {
         TurnResultDto scores = scoreCalculator.calculateFinalScores(gameSession);
 
         System.out.println(scores);
-        // 다시 게임 상태를 브로드캐스트하여 최신 상태를 클라이언트에 전달합니다.
+
         messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
         messageUtil.broadcastGameResult(gameSession.getSessionId(), scores);
 
@@ -339,11 +339,11 @@ public class GameService {
         dto.setCurrentPhase(gameSession.getCurrentPhase().ordinal());
         dto.setRemainingTime(gameSession.getRemainingTime());
 
-        if (gameSession.getCurrentPhase() == GamePhase.DESCRIPTION) {
-            dto.setCurrentPrompts(gameSession.getCurrentPrompts());
-        } else if (gameSession.getCurrentPhase() == GamePhase.GUESSING) {
-            dto.setCurrentGuesses(gameSession.getCurrentGuesses());
-        }
+//        if (gameSession.getCurrentPhase() == GamePhase.DESCRIPTION) {
+//            dto.setCurrentPrompts(gameSession.getCurrentPrompts());
+//        } else if (gameSession.getCurrentPhase() == GamePhase.GUESSING) {
+//            dto.setCurrentGuesses(gameSession.getCurrentGuesses());
+//        }
 
         return dto;
     }
