@@ -103,11 +103,23 @@ public class GameService {
         gameSession.submitGuess(playerId, guess);
         updateSubmissionProgress(gameSession, "guess");
 //        if (gameSession.getCurrentGuesses().size() == gameSession.getPlayers().size()) {
+//            TurnResultDto turnResult = scoreCalculator.calculateScores(gameSession);
 //            moveToNextPhase(gameSession);
 //        }
+
+        CompletableFuture.runAsync(() -> calculateAndSaveScore(gameSession, playerId, guess));
+
         updateGameSession(gameSession);
         messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
         return createGameStateDto(gameSession);
+    }
+
+    private void calculateAndSaveScore(GameSession gameSession, String playerId, String guess) {
+        String targetPlayerId = gameSession.getGuessTargetForPlayer(playerId);
+        String targetKeyword = gameSession.getCurrentKeywords().get(targetPlayerId);
+        float score = scoreCalculator.calculateSingleGuessScore(guess, targetKeyword);
+        gameSession.addScore(playerId, targetPlayerId, score);
+        updateGameSession(gameSession);
     }
 
     private void startLoadingPhase(GameSession gameSession) {
@@ -211,7 +223,7 @@ public class GameService {
         messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
         messageUtil.broadcastPhaseStartMessage(gameSession.getSessionId(), gameSession.getCurrentPhase(), "Turn Result Phase");
 
-        TurnResultDto scores = scoreCalculator.calculateScores(gameSession);
+        TurnResultDto scores = scoreCalculator.calculateFinalScores(gameSession);
 
         System.out.println(scores);
         // 다시 게임 상태를 브로드캐스트하여 최신 상태를 클라이언트에 전달합니다.
