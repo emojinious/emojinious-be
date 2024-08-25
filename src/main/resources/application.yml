@@ -9,12 +9,9 @@ spring:
     active: dev
   data:
     redis:
-      #      host: ENC(+wbrYVQvJOCGwJb04tH8kHm1FNZkNNw4Zc0lokyjSddSQHjC6fr24hkZhCeuZQCQwKAV0R2eaSwUzjzmkm3o2DSvxT1Upw/3)
-      #      port: 15733
-      #      password: ENC(dbtRPEzugAJK7jIuKNgFhX097hSLYZsXBhoxlJGMDhaf6IQ+mHdEppU7leiQKM8V)
-      host: redis-10815.c17.us-east-1-4.ec2.redns.redis-cloud.com
-      port: 10815
-      password: IpEQsQFHhqT0MeBteB3Fa8AjtAC4ByuQ
+            host: ENC(+wbrYVQvJOCGwJb04tH8kHm1FNZkNNw4Zc0lokyjSddSQHjC6fr24hkZhCeuZQCQwKAV0R2eaSwUzjzmkm3o2DSvxT1Upw/3)
+            port: 15733
+            password: ENC(dbtRPEzugAJK7jIuKNgFhX097hSLYZsXBhoxlJGMDhaf6IQ+mHdEppU7leiQKM8V)
       ssl:
         enabled: true
   web:
