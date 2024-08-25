@@ -9,9 +9,12 @@ spring:
     active: dev
   data:
     redis:
-      host: ENC(+wbrYVQvJOCGwJb04tH8kHm1FNZkNNw4Zc0lokyjSddSQHjC6fr24hkZhCeuZQCQwKAV0R2eaSwUzjzmkm3o2DSvxT1Upw/3)
-      port: 15733
-      password: ENC(dbtRPEzugAJK7jIuKNgFhX097hSLYZsXBhoxlJGMDhaf6IQ+mHdEppU7leiQKM8V)
+#      host: ENC(+wbrYVQvJOCGwJb04tH8kHm1FNZkNNw4Zc0lokyjSddSQHjC6fr24hkZhCeuZQCQwKAV0R2eaSwUzjzmkm3o2DSvxT1Upw/3)
+#      port: 15733
+#      password: ENC(dbtRPEzugAJK7jIuKNgFhX097hSLYZsXBhoxlJGMDhaf6IQ+mHdEppU7leiQKM8V)
+      host: redis-11976.c302.asia-northeast1-1.gce.redns.redis-cloud.com
+      port: 11976
+      password: 8gCM4Wt8ycKuEkYLnts1euhv6Q45iK2b
       ssl:
         enabled: true
   web:

@@ -24,6 +24,10 @@ public class ImageGenerator {
     }
 
     public CompletableFuture<String> getImagesFromMessageAsync(String message) {
+        if(message.equals(" ")){
+            return CompletableFuture.completedFuture(null);
+
+        }
         return CompletableFuture.supplyAsync(() -> {
             PromptSubmissionMessage prompt = new PromptSubmissionMessage(message);
             String response = callImageAI(prompt);

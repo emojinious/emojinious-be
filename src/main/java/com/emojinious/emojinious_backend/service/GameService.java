@@ -134,7 +134,7 @@ public class GameService {
         updateSubmissionProgress(gameSession, "prompt");
     }
 
-    private void startGenerationPhase(GameSession gameSession) { // 프롬프트 안쓴애들 처리
+    private void startGenerationPhase(GameSession gameSession) {
         System.out.println("GameService.startGenerationPhase");
         messageUtil.broadcastPhaseStartMessage(gameSession.getSessionId(), gameSession.getCurrentPhase(), "Image Generation");
         messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
@@ -144,6 +144,11 @@ public class GameService {
         System.out.println("gameSession = " + gameSession.getCurrentPrompts());
 
         gameSession.getCurrentPrompts().forEach((playerId, prompt) -> {
+            //프롬프트 공백
+            if(prompt == null || prompt.trim().isEmpty()){
+                prompt = " ";
+            }
+
             System.out.println("prompt = " + prompt);
             CompletableFuture<Void> future = imageGenerator.getImagesFromMessageAsync(prompt)
                     .thenAccept(imageUrl -> {
@@ -206,9 +211,13 @@ public class GameService {
         messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
         messageUtil.broadcastPhaseStartMessage(gameSession.getSessionId(), gameSession.getCurrentPhase(), "Turn Result Phase");
 
-        //플레이어의 키워드, 이미지, 프롬프트 공개
+        TurnResultDto scores = scoreCalculator.calculateScores(gameSession);
 
+        System.out.println(scores);
+        // 다시 게임 상태를 브로드캐스트하여 최신 상태를 클라이언트에 전달합니다.
         messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
+        messageUtil.broadcastGameResult(gameSession.getSessionId(), scores);
+
     }
 
     private void moveToNextPhase(GameSession gameSession) {
@@ -240,12 +249,11 @@ public class GameService {
     private void endGame(GameSession gameSession) {
         gameSession.setState(GameState.FINISHED);
         updateGameSession(gameSession);
-        Map<String, Integer> scores = scoreCalculator.calculateScores(gameSession);
-        gameSession.getPlayers().forEach(player ->
-                player.setScore(scores.get(player.getId())));
+//        gameSession.getPlayers().forEach(player ->
+//                player.setScore(scores.get(player.getId())));
         messageUtil.broadcastGameState(gameSession.getSessionId(), createGameStateDto(gameSession));
         messageUtil.broadcastPhaseStartMessage(gameSession.getSessionId(), gameSession.getCurrentPhase(), "게임이 종료되었습니다. 결과를 확인해주세요.");
-        messageUtil.broadcastGameResult(gameSession.getSessionId(), scores);
+
         redisTemplate.delete(GAME_SESSION_KEY + gameSession.getSessionId());
     }
 
@@ -399,3 +407,6 @@ public class GameService {
         messageUtil.updateSubmissionProgress(gameSession.getSessionId(), type, submitted, total);
     }
 }
+
+//turn result 프론트로 보내주기
+//다른사람의 평균값 자신의 점수로 더하기

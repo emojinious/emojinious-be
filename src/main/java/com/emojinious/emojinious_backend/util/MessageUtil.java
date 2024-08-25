@@ -40,7 +40,7 @@ public class MessageUtil {
                 Map.of("phase", phase, "message", message));
     }
 
-    public void broadcastGameResult(String sessionId, Map<String, Integer> scores) {
+    public void broadcastGameResult(String sessionId, TurnResultDto scores) {
         messagingTemplate.convertAndSend("/topic/game/" + sessionId + "/result", scores);
     }
 

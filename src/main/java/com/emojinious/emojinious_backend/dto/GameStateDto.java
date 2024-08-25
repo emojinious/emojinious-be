@@ -16,4 +16,6 @@ public class GameStateDto {
     private Map<String, String> currentPrompts;
     private Map<String, String> currentGuesses;
     private long remainingTime;
+
+
 }
