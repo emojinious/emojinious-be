@@ -4,7 +4,6 @@ import com.emojinious.emojinious_backend.cache.Player;
 import com.emojinious.emojinious_backend.constant.GamePhase;
 import com.emojinious.emojinious_backend.constant.GameState;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import java.util.stream.Collectors;
 import lombok.Data;
 import java.io.Serializable;
 import java.util.*;
@@ -20,9 +19,9 @@ public class GameSession implements Serializable {
     private GamePhase currentPhase;
     private Map<String, String> currentPrompts;
 
-    private Map<String, Map<String, Float>> playerScores;
+    private Map<String, Map<String, Float>> playerScores; // <나 <상대방, 내가 얻은 점수>>
 
-    private Map<String, String> currentGuesses;
+    private List<Map<String, String>> currentGuesses;
     private Map<String, String> currentKeywords;
     private Map<String, String> generatedImages;
     private long phaseStartTime;
@@ -44,7 +43,7 @@ public class GameSession implements Serializable {
         this.currentPhase = GamePhase.WAITING;
         this.currentPrompts = new HashMap<>();
         this.playerScores = new HashMap<>();
-        this.currentGuesses = new HashMap<>();
+        this.currentGuesses = new ArrayList<>();
         this.currentKeywords = new HashMap<>();
         this.generatedImages = new HashMap<>();
         this.currentGuessRound = 0;
@@ -141,7 +140,14 @@ public class GameSession implements Serializable {
     }
 
     public long getRemainingTime() {
-        return Math.max(0, phaseEndTime - System.currentTimeMillis());
+        if (currentPhase == GamePhase.GUESSING && currentGuessRound > 0) {
+            long totalGuessingTime = settings.getGuessTimeLimit() * 1000L;
+            long elapsedTimeInCurrentRound = System.currentTimeMillis() - currentRoundStartTime;
+
+            return Math.max(0, totalGuessingTime - elapsedTimeInCurrentRound);
+        } else {
+            return Math.max(0, phaseEndTime - System.currentTimeMillis());
+        }
     }
 
     public Player getPlayerById(String playerId) {
@@ -173,7 +179,16 @@ public class GameSession implements Serializable {
         if (currentPhase != GamePhase.GUESSING) {
             throw new IllegalStateException("Not in guessing phase");
         }
-        currentGuesses.put(playerId, guess);
+        String targetId = getGuessTargetForPlayer(playerId);
+        Map<String, String> guessMap = new HashMap<>();
+        guessMap.put("targetId", targetId);
+        guessMap.put("guesserId", playerId);
+        guessMap.put("guess", guess);
+        currentGuesses.add(guessMap);
+        System.out.println("currentGuesses = " + currentGuesses);
+
+        guessedPlayers.computeIfAbsent(playerId, k -> new HashSet<>()).add(targetId);
+
 //        if (currentGuesses.size() == players.size()) {
 //            moveToNextPhase();
 //        }
@@ -186,7 +201,7 @@ public class GameSession implements Serializable {
 
     public void startNewGuessRound() {
         currentGuessRound++;
-        currentGuesses.clear();
+//        currentGuesses.clear();
         players.forEach(player -> guessedPlayers.put(player.getId(), new HashSet<>()));
         currentRoundStartTime = System.currentTimeMillis();
     }
