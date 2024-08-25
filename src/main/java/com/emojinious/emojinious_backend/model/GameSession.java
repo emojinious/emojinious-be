@@ -19,6 +19,9 @@ public class GameSession implements Serializable {
     private int currentTurn;
     private GamePhase currentPhase;
     private Map<String, String> currentPrompts;
+
+    private Map<String, Map<String, Float>> playerScores;
+
     private Map<String, String> currentGuesses;
     private Map<String, String> currentKeywords;
     private Map<String, String> generatedImages;
@@ -40,12 +43,18 @@ public class GameSession implements Serializable {
         this.currentTurn = 0;
         this.currentPhase = GamePhase.WAITING;
         this.currentPrompts = new HashMap<>();
+        this.playerScores = new HashMap<>();
         this.currentGuesses = new HashMap<>();
         this.currentKeywords = new HashMap<>();
         this.generatedImages = new HashMap<>();
         this.currentGuessRound = 0;
         this.guessedPlayers = new HashMap<>();
         this.currentRoundStartTime = 0;
+    }
+
+    public void addScore(String playerId, String targetPlayerId, float score) {
+        playerScores.computeIfAbsent(playerId, k -> new HashMap<>())
+                .put(targetPlayerId, score);
     }
 
     public void addPlayer(Player player) {
