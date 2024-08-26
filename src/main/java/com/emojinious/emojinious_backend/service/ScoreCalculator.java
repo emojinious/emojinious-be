@@ -29,7 +29,8 @@ public class ScoreCalculator {
     }
 
     private float getSimilarityScore(String sentence1, String sentence2) {
-        String url = "http://192.168.0.40:8000/api/similarity/score";
+//         String url = "http://192.168.0.40:8000/api/similarity/score";
+        String url = "http://127.0.0.1:8000/api/similarity/score";
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
