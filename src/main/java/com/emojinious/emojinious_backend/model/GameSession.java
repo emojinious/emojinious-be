@@ -29,6 +29,7 @@ public class GameSession implements Serializable {
     private int currentGuessRound;
     private Map<String, Set<String>> guessedPlayers;
     private long currentRoundStartTime;
+    private int currentRoundSubmittedGuesses;
 
     public GameSession() {
         // 역직렬화 문제 방지, 이제필요없음(아마도)
@@ -117,20 +118,11 @@ public class GameSession implements Serializable {
         System.out.println("GameSession.startPhaseTimer : " + currentPhase);
         phaseStartTime = System.currentTimeMillis();
         switch (currentPhase) {
-            case DESCRIPTION:
-                phaseEndTime = phaseStartTime + (settings.getPromptTimeLimit() * 1000L);
-                break;
-            case GUESSING:
-                phaseEndTime = phaseStartTime + (settings.getGuessTimeLimit() * 1000L);
-                break;
-            case CHECKING:
-                phaseEndTime = phaseStartTime + 10 * 1000L;
-                break;
-            case TURN_RESULT:
-                phaseEndTime = phaseStartTime + 2 * 10 * 1000L;
-                break;
-            default:
-                phaseEndTime = phaseStartTime + 60 * 10 * 1000L;
+            case DESCRIPTION -> phaseEndTime = phaseStartTime + (settings.getPromptTimeLimit() * 1000L);
+            case GUESSING -> phaseEndTime = phaseStartTime + (settings.getGuessTimeLimit() * 1000L);
+            case CHECKING -> phaseEndTime = phaseStartTime + 15 * 1000L;
+            case TURN_RESULT -> phaseEndTime = phaseStartTime + 10 * 1000L;
+            default -> phaseEndTime = phaseStartTime + 60 * 10 * 1000L;
         }
         System.out.println("Time: " + (phaseEndTime - phaseStartTime) + " ms");
     }
@@ -188,7 +180,7 @@ public class GameSession implements Serializable {
         System.out.println("currentGuesses = " + currentGuesses);
 
         guessedPlayers.computeIfAbsent(playerId, k -> new HashSet<>()).add(targetId);
-
+        currentRoundSubmittedGuesses++;
 //        if (currentGuesses.size() == players.size()) {
 //            moveToNextPhase();
 //        }
@@ -202,6 +194,7 @@ public class GameSession implements Serializable {
     public void startNewGuessRound() {
         currentGuessRound++;
 //        currentGuesses.clear();
+        currentRoundSubmittedGuesses = 0;
         players.forEach(player -> guessedPlayers.put(player.getId(), new HashSet<>()));
         currentRoundStartTime = System.currentTimeMillis();
     }

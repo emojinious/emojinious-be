@@ -414,7 +414,12 @@ public class GameService {
     }
 
     private void updateSubmissionProgress(GameSession gameSession, String type) {
-        int submitted = type.equals("prompt") ? gameSession.getCurrentPrompts().size() : gameSession.getCurrentGuesses().size();
+        int submitted;
+        if (type.equals("prompt")) {
+            submitted = gameSession.getCurrentPrompts().size();
+        } else { // guess
+            submitted = gameSession.getCurrentRoundSubmittedGuesses();
+        }
         int total = gameSession.getPlayers().size();
         messageUtil.updateSubmissionProgress(gameSession.getSessionId(), type, submitted, total);
     }
