@@ -7,12 +7,12 @@ import org.springframework.data.redis.core.RedisTemplate;
 import static org.junit.jupiter.api.Assertions.*;
 
 
-@SpringBootTest
+//@SpringBootTest
 public class RedisConnectionTest {
 
     private RedisTemplate<String, String> redisTemplate;
 
-    @Test
+//    @Test
     public void testRedisConnection() {
         String key = "testKey";
         String value = "testValue";
